@@ -1,0 +1,66 @@
+graph TD
+
+    %% Tiers definition
+
+    subgraph Client_Tier [Client Tier]
+
+        App[React Native / Expo Mobile App]
+
+    end
+
+    subgraph Backend_Tier [Backend / Logic Tier - Firebase]
+
+        Auth[Firebase Authentication]
+
+        Functions[Cloud Functions]
+
+        FCM[Firebase Cloud Messaging]
+
+    end
+
+
+
+    subgraph Data_Tier [Data Tier]
+
+        Firestore[(Cloud Firestore - Real-time DB)]
+
+        Storage[(Firebase Storage - Media)]
+
+    end
+
+
+
+    %% Communication Flow
+
+    App -->|1. Authenticate| Auth
+
+    App <-->|2. Real-time Sync / Report Submission| Firestore
+
+    App -->|3. Upload Evidence Photo/Video| Storage
+
+    App -->|4. Trigger SOS Alert| Firestore
+
+
+
+
+    %% Logic & Notifications
+
+    Firestore -->|6. Trigger on Status Change| Functions
+
+    Functions -->|7. Send Push Notification| FCM
+
+    FCM -->|8. Alert Nearby Users| App
+
+
+
+    %% Styling for better presentation
+
+    style Client_Tier fill:#fff,stroke:#333,stroke-width:2px
+
+    style Backend_Tier fill:#fff,stroke:#333,stroke-width:2px
+
+    style Data_Tier fill:#fff,stroke:#333,stroke-width:2px
+
+    style Firestore fill:#fff
+
+    style Storage fill:#fff

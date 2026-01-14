@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    participant Auth as Firebase Authentication
+    participant DB as Firestore Database
+    participant CF as Cloud Functions
+    participant Storage as Firebase Storage
+    participant FCM as Cloud Messaging (FCM)
+    participant Contacts as Emergency Contacts
+    participant App as Expo App
+
+    Note over Auth, App: Authentication & Role Assignment
+    Auth->>DB: Validate User Credentials
+    DB-->>Auth: Return Role (User/Admin)
+    Auth-->>App: Provide Access Token
+
+    Note over Auth, App: Disaster Report Handling
+    App->>DB: Submit Disaster Report
+    DB->>CF: Trigger: OnCreate (New Report)
+    CF->>DB: Set Initial Status = "Pending"
+    CF->>FCM: Notify Nearby Users of New Entry
+
+    Note over Auth, App: Media Association
+    App->>Storage: Upload Media Files
+    Storage-->>DB: Save & Map Media URL to Report ID
+
+    Note over Auth, App: Voting & Verification Logic
+    App->>DB: Submit Community Vote
+    DB->>CF: Trigger: OnUpdate (Vote Count)
+    rect rgb(240, 240, 240)
+        Note right of CF: Business Logic
+        CF->>CF: Evaluate Vote Threshold
+        CF->>DB: Update Verification Status
+    end
+    CF->>FCM: Notify Users & Admin of Status Change
+
+    Note over Auth, App: SOS Automation
+    App->>DB: Store SOS Alert Event
+    DB->>CF: Trigger: SOS Event
+    CF->>Contacts: Dispatch Emergency Alerts (SMS/Push)
+    CF->>FCM: Notify Admin of High-Priority Emergency
+
+    Note over Auth, App: Data Cleanup & Sync
+    DB->>CF: Trigger: OnDelete
+    CF->>Storage: Remove Orphaned Media Files
+    CF->>DB: Clean Up Database References
+    DB-->>App: Stream Live Updates (Snapshot Listeners)

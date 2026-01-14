@@ -1,0 +1,113 @@
+@startuml
+title Class Diagram – Sosync Crowdsourced Disaster Alert & Safety App
+
+class User {
+  - userId : String
+  - fullName : String
+  - email : String
+  - phoneNumber : String
+  - role : String
+  - isActive : Boolean
+  + login()
+  + logout()
+}
+
+class Admin {
+  + verifyReport()
+  + resolveReport()
+  + manageUsers()
+  + removeMedia()
+}
+
+User <|-- Admin
+
+class EmergencyContact {
+  - contactId : String
+  - name : String
+  - phoneNumber : String
+}
+
+User "1" -- "0..*" EmergencyContact : has
+
+class Location {
+  - latitude : Double
+  - longitude : Double
+  - address : String
+}
+
+class DisasterReport {
+  - reportId : String
+  - type : String
+  - description : String
+  - status : String
+  - severityLevel : String
+  - timestamp : Date
+  + createReport()
+  + updateStatus()
+}
+
+User "1" -- "0..*" DisasterReport : creates
+DisasterReport "1" -- "1" Location : has
+
+class Vote {
+  - voteId : String
+  - voteType : String
+  - timestamp : Date
+}
+
+User "1" -- "0..*" Vote
+DisasterReport "1" -- "0..*" Vote : receives
+
+class Media {
+  - mediaId : String
+  - mediaType : String
+  - mediaUrl : String
+}
+
+DisasterReport "1" -- "0..*" Media : contains
+
+class SOSAlert {
+  - sosId : String
+  - timestamp : Date
+  - status : String
+}
+
+User "1" -- "0..*" SOSAlert : triggers
+SOSAlert "1" -- "1" Location : uses
+
+class Notification {
+  - notificationId : String
+  - message : String
+  - timestamp : Date
+  - isRead : Boolean
+}
+
+User "0..*" -- "0..*" Notification : receives
+Notification "0..*" --> "0..1" DisasterReport : refersTo
+
+class AuthService {
+  + authenticateUser()
+  + assignRole()
+}
+
+class ReportService {
+  + saveReport()
+  + fetchReports()
+  + updateReportStatus()
+}
+
+class VotingService {
+  + recordVote()
+  + calculateVerification()
+}
+
+class SOSService {
+  + broadcastSOS()
+}
+
+User ..> AuthService
+DisasterReport ..> ReportService
+Vote ..> VotingService
+SOSAlert ..> SOSService
+
+@enduml

@@ -1,0 +1,52 @@
+@startuml
+title System/Backend Sequence Diagram
+
+participant "Firebase Authentication" as Auth
+participant "Firestore" as DB
+participant "Cloud Functions" as CF
+participant "Firebase Storage" as Storage
+participant "Firebase Cloud Messaging" as FCM
+participant "Emergency Contacts" as Contacts
+participant "Expo App" as App
+
+== Authentication & Role Assignment ==
+Auth -> DB : Validate user
+DB --> Auth : Role (User/Admin)
+Auth --> App : Access token
+
+== Disaster Report Handling ==
+App -> DB : Submit disaster report
+DB -> CF : New report trigger
+CF -> DB : Set status = Pending
+CF -> FCM : Notify nearby users
+
+== Media Association ==
+App -> Storage : Upload media
+Storage --> DB : Save media URL
+
+== Voting & Verification Logic ==
+App -> DB : Submit vote
+DB -> CF : Vote update trigger
+CF -> CF : Check vote threshold
+CF -> DB : Update verification status
+CF -> FCM : Notify users & admin
+
+== Admin Overrides ==
+DB -> CF : Admin status update
+CF -> FCM : Broadcast status change
+
+== SOS Automation ==
+App -> DB : Store SOS alert
+DB -> CF : SOS trigger
+CF -> Contacts : Send emergency alerts
+CF -> FCM : Notify admin
+
+== Data Cleanup ==
+DB -> CF : Report/media deletion
+CF -> Storage : Remove media
+CF -> DB : Update references
+
+== Real-Time Sync ==
+DB --> App : Live updates
+
+@enduml

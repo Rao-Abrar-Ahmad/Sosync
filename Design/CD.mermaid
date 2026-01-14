@@ -1,0 +1,121 @@
+classDiagram
+   direction RL
+    %% Class Definitions with Attributes and Methods
+    class User {
+        -String userId
+        -String fullName
+        -String email
+        -String phoneNumber
+        -String role
+        -Boolean isActive
+        +login()
+        +logout()
+    }
+
+    class Admin {
+        +verifyReport()
+        +resolveReport()
+        +manageUsers()
+        +removeMedia()
+    }
+
+    class EmergencyContact {
+        -String contactId
+        -String name
+        -String phoneNumber
+    }
+
+    class Location {
+        -Double latitude
+        -Double longitude
+        -String address
+    }
+
+    class DisasterReport {
+        -String reportId
+        -String type
+        -String description
+        -String status
+        -String severityLevel
+        -Date timestamp
+        +createReport()
+        +updateStatus()
+    }
+
+    class Vote {
+        -String voteId
+        -String voteType
+        -Date timestamp
+    }
+
+    class Media {
+        -String mediaId
+        -String mediaType
+        -String mediaUrl
+    }
+
+    class SOSAlert {
+        -String sosId
+        -Date timestamp
+        -String status
+    }
+
+    class Notification {
+        -String notificationId
+        -String message
+        -Date timestamp
+        -Boolean isRead
+    }
+
+    class AuthService {
+        +authenticateUser()
+        +assignRole()
+    }
+
+    class ReportService {
+        +saveReport()
+        +fetchReports()
+        +updateReportStatus()
+    }
+
+    class VotingService {
+        +recordVote()
+        +calculateVerification()
+    }
+
+    class SOSService {
+        +broadcastSOS()
+    }
+
+    %% Relationships
+    Admin --|> User : Inherits
+    User "1" -- "0..*" EmergencyContact : manages
+    User "1" -- "0..*" DisasterReport : creates
+    User "1" -- "0..*" Vote : casts
+    User "1" -- "0..*" SOSAlert : triggers
+    User "0..*" -- "0..*" Notification : receives
+    
+    DisasterReport "1" -- "1" Location : locatedAt
+    DisasterReport "1" -- "0..*" Vote : receives
+    DisasterReport "1" -- "0..*" Media : contains
+    Notification "0..*" --> "0..1" DisasterReport : references
+    SOSAlert "1" -- "1" Location : captureLocation
+
+    %% Dependency Links
+    User ..> AuthService : Uses
+    DisasterReport ..> ReportService : Uses
+    Vote ..> VotingService : Uses
+    SOSAlert ..> SOSService : Uses
+
+    %% Styling / Colors
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style Admin fill:#f9f,stroke:#333,stroke-width:2px
+    style DisasterReport fill:#bbf,stroke:#333,stroke-width:2px
+    style SOSAlert fill:#ff9999,stroke:#333,stroke-width:2px
+    style AuthService fill:#dfd,stroke:#333,stroke-width:1px
+    style ReportService fill:#dfd,stroke:#333,stroke-width:1px
+    style VotingService fill:#dfd,stroke:#333,stroke-width:1px
+    style SOSService fill:#dfd,stroke:#333,stroke-width:1px
+    style Location fill:#fff4dd,stroke:#d4a017,stroke-width:1px
+    style Media fill:#fff4dd,stroke:#d4a017,stroke-width:1px
+    style Notification fill:#fff4dd,stroke:#d4a017,stroke-width:1px

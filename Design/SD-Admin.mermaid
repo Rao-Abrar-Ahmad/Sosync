@@ -1,0 +1,43 @@
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant Panel as Expo Admin Panel
+    participant Auth as Firebase Authentication
+    participant DB as Firestore Database
+    participant Storage as Firebase Storage
+    participant CF as Cloud Functions
+    participant FCM as Cloud Messaging (FCM)
+
+    Note over Admin, FCM: Admin Authentication
+    Admin->>Panel: Enter Login Credentials
+    Panel->>Auth: Authenticate Admin
+    Auth-->>Panel: Authentication Success
+
+    Note over Admin, FCM: View & Review Reports
+    Admin->>Panel: Request Disaster Reports
+    Panel->>DB: Fetch All Reports
+    DB-->>Panel: Return Reports Data
+    Admin->>Panel: View Community Vote Stats
+    Panel->>DB: Fetch Vote Counts
+    DB-->>Panel: Return Voting Results
+
+    Note over Admin, FCM: Moderate Disaster Reports
+    Admin->>Panel: Set Status (Verify / Resolve / False)
+    Panel->>DB: Update Report Status Field
+    DB->>CF: Trigger Status Change Logic
+    CF->>FCM: Dispatch Notification to Relevant Users
+    FCM-->>Panel: Notification Sent Confirmation
+
+    Note over Admin, FCM: Media & User Management
+    Admin->>Panel: Delete Misleading Media
+    Panel->>Storage: Delete File
+    Storage-->>Panel: Deletion Confirmed
+    
+    Admin->>Panel: Toggle User Access (Enable/Disable)
+    Panel->>DB: Update User Account Status
+    DB-->>Panel: Success Confirmation
+
+    Note over Admin, FCM: Monitoring
+    Admin->>Panel: Monitor Active SOS Events
+    Panel->>DB: Fetch Recent SOS Records
+    DB-->>Panel: Return SOS Data

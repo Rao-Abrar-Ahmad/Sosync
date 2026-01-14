@@ -1,0 +1,47 @@
+@startuml
+title Admin Interaction Sequence Diagram
+
+actor Admin
+participant "Expo App" as Panel
+participant "Firebase Authentication" as Auth
+participant "Firestore" as DB
+participant "Firebase Storage" as Storage
+participant "Cloud Functions" as CF
+participant "Firebase Cloud Messaging" as FCM
+
+== Admin Authentication ==
+Admin -> Panel : Login credentials
+Panel -> Auth : Authenticate admin
+Auth --> Panel : Authentication success
+
+== View & Review Reports ==
+Admin -> Panel : View disaster reports
+Panel -> DB : Fetch reports
+DB --> Panel : Reports data
+Admin -> Panel : View vote statistics
+Panel -> DB : Fetch vote counts
+DB --> Panel : Voting results
+
+== Moderate Disaster Reports ==
+Admin -> Panel : Verify / Resolve / Mark false
+Panel -> DB : Update report status
+DB -> CF : Trigger business logic
+CF -> FCM : Notify users
+FCM --> Panel : Notification sent
+
+== Manage Report Media ==
+Admin -> Panel : Remove misleading media
+Panel -> Storage : Delete media
+Storage --> Panel : Confirmation
+
+== User Management ==
+Admin -> Panel : Enable / Disable user
+Panel -> DB : Update user status
+DB --> Panel : Confirmation
+
+== Monitor SOS Events ==
+Admin -> Panel : View SOS alerts
+Panel -> DB : Fetch SOS records
+DB --> Panel : SOS data
+
+@enduml

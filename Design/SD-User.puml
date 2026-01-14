@@ -1,0 +1,57 @@
+@startuml
+title User Interaction Sequence Diagram
+
+actor User
+participant "Expo App" as App
+participant "Firebase Authentication" as Auth
+participant "Firestore" as DB
+participant "Firebase Storage" as Storage
+participant "GPS Service" as GPS
+participant "Firebase Cloud Messaging" as FCM
+participant "Emergency Contacts" as Contacts
+
+User -> App : Launch app
+App -> Auth : Authenticate user
+Auth --> App : Login success
+
+== View Disaster Reports ==
+User -> App : View reports
+App -> DB : Fetch reports
+DB --> App : Report list
+App --> User : Display list / map
+
+== Create Disaster Report ==
+User -> App : Create report
+App -> GPS : Fetch location
+GPS --> App : Coordinates
+User -> App : Add details & media
+App -> Storage : Upload media
+Storage --> App : Media URL
+App -> DB : Save report
+
+== Vote on Report ==
+User -> App : Confirm / Dismiss report
+App -> DB : Save vote
+DB --> App : Vote recorded
+
+== Manage Emergency Contacts ==
+User -> App : Add / Update contacts
+App -> DB : Save contacts
+DB --> App : Confirmation
+
+== SOS Emergency ==
+User -> App : Press SOS
+App -> DB : Check saved contacts
+DB --> App : Contact list
+App -> GPS : Get live location
+GPS --> App : Coordinates
+App -> Contacts : Send SOS alert
+App -> DB : Store SOS event
+
+== Notifications ==
+FCM --> App : Receive notification
+App --> User : Show alert
+
+@enduml
+
+

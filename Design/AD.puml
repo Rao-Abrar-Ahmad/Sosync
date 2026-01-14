@@ -1,0 +1,34 @@
+@startuml
+title Sosync Tier Architecture Diagram
+top to bottom direction
+
+node "Client Tier" {
+    [Expo React Native App]
+}
+
+node "Data Tier" {
+    database "Firestore" as DB
+    database "Firebase Storage" as Storage
+}
+
+node "Backend Tier" {
+    [Firebase Authentication]
+    [Cloud Functions]
+    [Firebase Cloud Messaging (FCM)]
+}
+
+' Communication Flow
+[Expo React Native App] --> [Firebase Authentication] : Login / Signup
+
+
+
+[Expo React Native App] <--> DB : Read / Write Reports
+[Expo React Native App] <--> Storage : Upload / Fetch Media
+
+DB --> [Cloud Functions] : Triggers
+[Cloud Functions] --> DB : Update Status
+[Cloud Functions] --> [Firebase Cloud Messaging (FCM)] : Send Alerts
+[Firebase Cloud Messaging (FCM)] --> [Expo React Native App] : Push Notification
+[Firebase Authentication] --> [Expo React Native App] : Auth Token
+
+@enduml

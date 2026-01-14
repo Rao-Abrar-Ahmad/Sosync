@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant App as Expo Mobile App
+    participant GPS as GPS Service
+    participant Storage as Firebase Storage
+    participant DB as Firestore Database
+    participant Contacts as Emergency Contacts
+
+    Note over User, Contacts: User Task Sequence
+
+    rect rgb(240, 248, 255)
+    Note right of User: Create Disaster Report
+    User->>App: Select "Report Disaster"
+    App->>GPS: Request Current Location
+    GPS-->>App: Return Coordinates
+    User->>App: Input Details & Attach Media
+    App->>Storage: Upload Photos/Videos
+    Storage-->>App: Return Media URL
+    App->>DB: Save Report Data
+    DB-->>App: Success Confirmation
+    end
+
+    rect rgb(255, 240, 245)
+    Note right of User: SOS Emergency Flow
+    User->>App: Trigger SOS Button
+    App->>DB: Fetch Saved Emergency Contacts
+    DB-->>App: Return Contact List
+    App->>GPS: Get Precise Live Location
+    App->>Contacts: Send SOS Alert (SMS/Notification)
+    App->>DB: Log SOS Event
+    end
+
+    User->>App: Vote (Confirm/Dismiss) Report
+    App->>DB: Update Vote Count
+    DB-->>App: Refresh UI
