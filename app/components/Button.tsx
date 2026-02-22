@@ -40,9 +40,9 @@ const styles = StyleSheet.create({
         backgroundColor: Theme.variants.mint,
     },
     buttonText: {
-        fontFamily: Theme.typography.bodyBold,
+        fontFamily: Theme.typography.inter.regular,
         fontSize: 18,
-        fontWeight: 'bold',
+        letterSpacing: 1
     },
     buttonTextPrimary: {
         color: '#fff',

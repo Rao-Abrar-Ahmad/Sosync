@@ -112,12 +112,13 @@ export const Theme = {
     mainScreen: [Colors.alabasterGrey, Colors.mintCream, Colors.steelBlue],
   },
   typography: {
-    primary: "Geom",
-    secondary: "Inter",
-    heading: "Geom",
-    headingRegular: "Geom",
-    body: "Inter",
-    bodyBold: "Inter",
+    inter: {
+      regular: "Inter_400Regular",
+      medium: "Inter_500Medium",
+      semibold: "Inter_600SemiBold",
+      bold: "Inter_700Bold",
+    },
+    geom: "Geom",
   },
 };
 

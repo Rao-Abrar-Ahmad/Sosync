@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        fontFamily: Theme.typography.primary,
+        fontFamily: Theme.typography.geom,
         fontSize: 32,
         fontWeight: 'bold',
         color: Theme.variants.text,
