@@ -1,0 +1,115 @@
+Enum user_role {
+  ADMIN
+  USER
+}
+
+Enum disaster_type {
+  FLOOD
+  EARTHQUAKE
+  FIRE
+  ACCIDENT
+  LANDSLIDE
+  OTHER
+}
+
+Enum report_status {
+  PENDING
+  VERIFIED
+  RESOLVED
+  FALSE_ALARM
+}
+
+Enum vote_type {
+  CONFIRM
+  DISMISS
+}
+
+Enum notification_type {
+  DISASTER_ALERT
+  SOS_ALERT
+  SYSTEM
+}
+
+Table users {
+  id uuid [pk]
+  first_name varchar
+  last_name varchar
+  email varchar [unique, not null]
+  phone_number varchar
+  role user_role [not null]
+  is_active boolean [not null]
+  auth_provider varchar [not null] // email, google
+  created_at timestamp [not null]
+  updated_at timestamp
+}
+
+Table emergency_contacts {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, not null]
+  name varchar [not null]
+  email varchar
+  phone_number varchar
+  is_active boolean [not null]
+  created_at timestamp [not null]
+}
+
+Table disaster_reports {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, not null]
+  type disaster_type [not null]
+  description text [not null]
+  status report_status [not null]
+  latitude decimal [not null]
+  longitude decimal [not null]
+  address varchar
+  severity_level varchar
+  created_at timestamp [not null]
+  updated_at timestamp
+}
+
+Table report_media {
+  id uuid [pk]
+  report_id uuid [ref: > disaster_reports.id, not null]
+  media_type varchar [not null] // image, video
+  media_url varchar [not null]
+  created_at timestamp [not null]
+}
+
+Table votes {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, not null]
+  report_id uuid [ref: > disaster_reports.id, not null]
+  vote vote_type [not null]
+  created_at timestamp [not null]
+}
+
+Table sos_alerts {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, not null]
+  latitude decimal [not null]
+  longitude decimal [not null]
+  status varchar
+  created_at timestamp [not null]
+}
+
+Table notifications {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, not null]
+  report_id uuid [ref: - disaster_reports.id]
+  sos_id uuid [ref: - sos_alerts.id]
+  message text [not null]
+  type notification_type [not null]
+  is_read boolean [not null]
+  created_at timestamp [not null]
+}
+
+Table user_reputation {
+  user_id uuid [pk, ref: > users.id]
+  total_reports int [not null]
+  verified_reports int [not null]
+  false_reports int [not null]
+  confirm_votes int [not null]
+  dismiss_votes int [not null]
+  reputation_score int [not null]
+  last_updated timestamp
+}
