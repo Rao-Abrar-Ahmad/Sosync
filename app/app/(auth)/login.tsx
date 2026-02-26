@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/config/firebaseConfig';
 import Theme from '@/config/theme';
+import Input from '@/components/Input';
+import { globalStyles } from '@/config/styles';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
@@ -31,7 +33,7 @@ export default function LoginScreen() {
 
     return (
         <LinearGradient
-            colors={Theme.backgrounds.mainScreen as any}
+            colors={Theme.backgrounds.white as any}
             style={styles.container}
         >
             <KeyboardAvoidingView
@@ -44,11 +46,10 @@ export default function LoginScreen() {
                         <Text style={styles.subtitle}>Sign in to continue to Sosync</Text>
                     </View>
 
-                    <View style={styles.form}>
+                    <View style={globalStyles.form}>
                         <View style={styles.inputContainer}>
                             <Text style={styles.label}>Email</Text>
-                            <TextInput
-                                style={styles.input}
+                            <Input
                                 placeholder="Enter your email"
                                 value={email}
                                 onChangeText={setEmail}
@@ -59,8 +60,7 @@ export default function LoginScreen() {
 
                         <View style={styles.inputContainer}>
                             <Text style={styles.label}>Password</Text>
-                            <TextInput
-                                style={styles.input}
+                            <Input
                                 placeholder="Enter your password"
                                 value={password}
                                 onChangeText={setPassword}
@@ -80,7 +80,7 @@ export default function LoginScreen() {
 
                         <View style={styles.footer}>
                             <Text style={styles.footerText}>Don't have an account? </Text>
-                            <TouchableOpacity>
+                            <TouchableOpacity onPress={() => router.push('/signup')}>
                                 <Text style={styles.link}>Sign Up</Text>
                             </TouchableOpacity>
                         </View>
@@ -105,39 +105,28 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        fontFamily: Theme.typography.heading,
+        fontFamily: Theme.typography.geom,
         fontSize: 28,
         fontWeight: 'bold',
         color: Theme.variants.text,
     },
     subtitle: {
-        fontFamily: Theme.typography.body,
+        fontFamily: Theme.typography.inter.regular,
         fontSize: 16,
         color: Theme.variants.textMuted,
         marginTop: 5,
-    },
-    form: {
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        padding: 20,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
     },
     inputContainer: {
         marginBottom: 20,
     },
     label: {
-        fontFamily: Theme.typography.bodyBold,
+        fontFamily: Theme.typography.inter.medium,
         fontSize: 14,
         color: Theme.variants.text,
         marginBottom: 8,
-        fontWeight: '600',
     },
     input: {
-        fontFamily: Theme.typography.body,
+        fontFamily: Theme.typography.inter.regular,
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: Theme.variants.border,
@@ -156,10 +145,9 @@ const styles = StyleSheet.create({
         opacity: 0.7,
     },
     buttonText: {
-        fontFamily: Theme.typography.bodyBold,
+        fontFamily: Theme.typography.inter.bold,
         color: '#fff',
         fontSize: 18,
-        fontWeight: 'bold',
     },
     footer: {
         flexDirection: 'row',
@@ -167,14 +155,13 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     footerText: {
-        fontFamily: Theme.typography.body,
+        fontFamily: Theme.typography.inter.regular,
         color: Theme.variants.text,
         fontSize: 14,
     },
     link: {
-        fontFamily: Theme.typography.bodyBold,
+        fontFamily: Theme.typography.inter.bold,
         color: Theme.variants.primary,
         fontSize: 14,
-        fontWeight: 'bold',
     },
 });

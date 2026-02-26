@@ -110,6 +110,7 @@ export const Theme = {
   backgrounds: {
     // first main screen bg linear gradiant, 0% albaster, 58% mint, 100% steel blue
     mainScreen: [Colors.alabasterGrey, Colors.mintCream, Colors.steelBlue],
+    white: ["#fff", "#fff"],
   },
   typography: {
     inter: {
