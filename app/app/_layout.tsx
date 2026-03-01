@@ -9,6 +9,7 @@ import { auth } from '@/config/firebaseConfig';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { UserProvider } from '@/context/UserContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -84,14 +85,16 @@ function RootLayoutNav() {
   if (initializing) return null;
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        </Stack>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <UserProvider>
+      <SafeAreaProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }}>
+            <Stack.Screen name="(onboarding)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+          </Stack>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </UserProvider>
   );
 }

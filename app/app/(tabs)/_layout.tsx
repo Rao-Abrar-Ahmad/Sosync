@@ -1,9 +1,10 @@
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
-import { Text, View } from 'react-native';
+import AppHeader from '@/components/AppHeader';
+import Theme from '@/config/theme';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -15,6 +16,7 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -23,20 +25,24 @@ export default function TabLayout() {
         // to prevent a hydration error in React Navigation v6.
         headerShown: true,
         header(props) {
-          return (
-            <View style={{ backgroundColor: '#fff', height: 60, justifyContent: 'center', alignItems: 'center' }}>
-              <Text>Header</Text>
-            </View>
-          )
+          return <AppHeader />;
         },
         tabBarStyle: {
           backgroundColor: '#fff',
-          height: 60,
-          paddingBottom: 10,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
           borderTopLeftRadius: 12,
           borderTopRightRadius: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: '#e0e0e0',
+          borderBlockColor: '#e0e0e0',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 5,
         },
-        tabBarActiveBackgroundColor: '#f5f5f5',
+        tabBarActiveBackgroundColor: Theme?.colors.alabasterGrey,
         tabBarActiveTintColor: '#000',
       }}>
       <Tabs.Screen
@@ -44,6 +50,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+          
         }}
       />
       <Tabs.Screen

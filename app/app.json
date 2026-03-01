@@ -52,6 +52,15 @@
             "fonts": ["./assets/fonts/Geom.ttf"]
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to use your location.",
+          "isIosBackgroundLocationEnabled": true,
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location while you are using the app.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
       ]
     ],
     "experiments": {

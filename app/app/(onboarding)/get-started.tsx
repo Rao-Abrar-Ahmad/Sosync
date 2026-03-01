@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Theme from '@/config/theme';
 import Button from '@/components/Button';
+import Logo from '@/components/Logo';
 
 export default function GetStartedScreen() {
     const router = useRouter();
@@ -15,13 +16,7 @@ export default function GetStartedScreen() {
             style={styles.container}
         >
             <SafeAreaView style={styles.content}>
-                <View style={styles.logoContainer}>
-                    <Image
-                        source={require('../../assets/images/logo.png')}
-                        style={styles.logo}
-                        resizeMode="contain"
-                    />
-                </View>
+                <Logo />
 
                 <View style={styles.textContainer}>
                     <Text style={styles.title}>Crowdsourced</Text>
@@ -45,13 +40,6 @@ const styles = StyleSheet.create({
         gap: 20,
         paddingVertical: 60,
         paddingHorizontal: 20,
-    },
-    logoContainer: {
-        marginTop: 40,
-    },
-    logo: {
-        width: 150,
-        height: 150,
     },
     textContainer: {
         alignItems: 'center',
