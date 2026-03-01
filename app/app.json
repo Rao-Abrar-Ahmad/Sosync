@@ -22,7 +22,20 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
+      "package": "com.sosync.sosync"
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +47,9 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/Geom.ttf"],
+          "fonts": [
+            "./assets/fonts/Geom.ttf"
+          ],
           "android": {
             "fonts": [
               {
@@ -49,7 +64,9 @@
             ]
           },
           "ios": {
-            "fonts": ["./assets/fonts/Geom.ttf"]
+            "fonts": [
+              "./assets/fonts/Geom.ttf"
+            ]
           }
         }
       ],
