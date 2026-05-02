@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { auth } from '@/config/firebaseConfig';
 import Theme from '@/config/theme';
 import Input from '@/components/Input';
@@ -14,23 +16,25 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// 🔑 TEMPORARY: Google Auth Configuration
-// ⚠️  This is temporarily disabled to prevent app crashes
-// We will configure it properly later with Android Client ID
-// For now, Google Sign-In button is shown as disabled
-const GOOGLE_WEB_CLIENT_ID = ''; // Will be set up later
-const GOOGLE_ANDROID_CLIENT_ID = ''; // Will be set up later
-const GOOGLE_AUTH_ENABLED = false; // Temporarily disabled
+// 🔑 Google Auth Configuration
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+const GOOGLE_AUTH_ENABLED = true;
 
 export default function LoginScreen() {
+    const insets = useSafeAreaInsets();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const router = useRouter();
 
-    // 🔐 Google Auth Setup using expo-auth-session (TEMPORARILY DISABLED)
-    // This will be enabled once we configure Android Client ID
+    const redirectUri = makeRedirectUri();
+    console.log("\n============================================");
+    console.log("👉 YOUR REDIRECT URI IS:", redirectUri);
+    console.log("============================================\n");
+
+    // 🔐 Google Auth Setup using expo-auth-session
     const [request, response, promptAsync] = GOOGLE_AUTH_ENABLED
         ? Google.useAuthRequest({
             webClientId: GOOGLE_WEB_CLIENT_ID,
@@ -83,7 +87,7 @@ export default function LoginScreen() {
             // Success: Redirection will be handled by _layout.tsx
         } catch (error: any) {
             console.error('Login Error:', error);
-            
+
             // Handle specific Firebase errors
             if (error.code === 'auth/user-not-found') {
                 Alert.alert('Login Failed', 'No account found with this email');
@@ -93,7 +97,7 @@ export default function LoginScreen() {
                 Alert.alert('Login Failed', 'Invalid email address');
             } else if (error.code === 'auth/too-many-requests') {
                 Alert.alert('Login Failed', 'Too many failed attempts. Please try again later.');
-            } else if(error.code === 'auth/invalid-credential') {
+            } else if (error.code === 'auth/invalid-credential') {
                 Alert.alert('Login Failed', 'Invalid credentials. Please check your email and password.');
             } else {
                 Alert.alert('Login Failed', error.message);
@@ -112,9 +116,12 @@ export default function LoginScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
-                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 20) + 20, paddingTop: Math.max(insets.top, 20) + 20 }]}
+                    showsVerticalScrollIndicator={false}
+                >
                     <Logo />
-                    
+
                     <View style={styles.header}>
                         <Text style={styles.title}>Welcome Back</Text>
                         <Text style={styles.subtitle}>Sign in to continue to Sosync</Text>
@@ -214,7 +221,7 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: 'bold',
         color: Theme.variants.text,
-        marginBottom: 8,
+        marginBottom: 0,
     },
     subtitle: {
         fontFamily: Theme.typography.inter.regular,
@@ -224,7 +231,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     inputContainer: {
-        marginBottom: 20,
+        marginBottom: 16,
     },
     label: {
         fontFamily: Theme.typography.inter.medium,

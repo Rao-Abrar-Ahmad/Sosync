@@ -15,7 +15,7 @@ const Logo = () => {
 
 const styles = StyleSheet.create({
   logoContainer: {
-    marginTop: 40,
+    marginTop: 20,
     textAlign: 'center',
     alignItems: 'center',
     justifyContent: 'center',

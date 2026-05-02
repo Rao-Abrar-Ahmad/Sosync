@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword, signInWithCredential, GoogleAuthProvider, updateProfile } from 'firebase/auth';
 import { getDoc, doc } from 'firebase/firestore';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { auth, db } from '@/config/firebaseConfig';
 import { createUserDocument, userDocumentExists } from '@/config/dbutils';
 import Theme from '@/config/theme';
@@ -15,15 +17,13 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// 🔑 TEMPORARY: Google Auth Configuration
-// ⚠️  This is temporarily disabled to prevent app crashes
-// We will configure it properly later with Android Client ID
-// For now, Google Sign-Up button is shown as disabled
-const GOOGLE_WEB_CLIENT_ID = ''; // Will be set up later
-const GOOGLE_ANDROID_CLIENT_ID = ''; // Will be set up later
-const GOOGLE_AUTH_ENABLED = false; // Temporarily disabled
+// 🔑 Google Auth Configuration
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+const GOOGLE_AUTH_ENABLED = true;
 
 export default function SignupScreen() {
+    const insets = useSafeAreaInsets();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -34,8 +34,9 @@ export default function SignupScreen() {
     const [googleLoading, setGoogleLoading] = useState(false);
     const router = useRouter();
 
-    // 🔐 Google Auth Setup using expo-auth-session (TEMPORARILY DISABLED)
-    // This will be enabled once we configure Android Client ID
+    const redirectUri = makeRedirectUri();
+
+    // 🔐 Google Auth Setup using expo-auth-session
     const [request, response, promptAsync] = GOOGLE_AUTH_ENABLED
         ? Google.useAuthRequest({
             webClientId: GOOGLE_WEB_CLIENT_ID,
@@ -78,17 +79,23 @@ export default function SignupScreen() {
                 const lastName = displayNameParts.slice(1).join(' ') || '';
 
                 // Create new user profile using utility
-                await createUserDocument(user.uid, {
-                    id: user.uid,
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: user.email || '',
-                    phone_number: '',
-                    profile_picture: user.photoURL || '',
-                    role: 'USER',
-                    is_active: true,
-                    auth_provider: 'google',
-                });
+                try {
+                    await createUserDocument(user.uid, {
+                        id: user.uid,
+                        first_name: firstName,
+                        last_name: lastName,
+                        email: user.email || '',
+                        phone_number: '',
+                        profile_picture: user.photoURL || '',
+                        role: 'USER',
+                        is_active: true,
+                        auth_provider: 'google',
+                    });
+                } catch (dbError) {
+                    // Rollback Google Auth (delete the account if it was just created and DB failed)
+                    await user.delete();
+                    throw new Error("Failed to initialize database record. Please check Firestore setup.");
+                }
             }
 
             Alert.alert('Success', 'Account created successfully!', [
@@ -121,19 +128,20 @@ export default function SignupScreen() {
         }
 
         setLoading(true);
+        let userCreated = null;
         try {
             // 1. Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            userCreated = userCredential.user;
 
             // 2. Update user profile (displayName)
-            await updateProfile(user, {
+            await updateProfile(userCreated, {
                 displayName: `${firstName} ${lastName}`,
             });
 
             // 3. Create user document in Firestore using utility
-            await createUserDocument(user.uid, {
-                id: user.uid,
+            await createUserDocument(userCreated.uid, {
+                id: userCreated.uid,
                 first_name: firstName,
                 last_name: lastName,
                 email: email,
@@ -150,6 +158,15 @@ export default function SignupScreen() {
         } catch (error: any) {
             console.error('Signup Error:', error);
 
+            // Rollback user creation if Firestore fails
+            if (userCreated && error.code !== 'auth/email-already-in-use' && error.code !== 'auth/invalid-email' && error.code !== 'auth/weak-password') {
+                try {
+                    await userCreated.delete();
+                } catch (rollbackError) {
+                    console.error('Failed to rollback user creation:', rollbackError);
+                }
+            }
+
             // Handle specific Firebase errors
             if (error.code === 'auth/email-already-in-use') {
                 Alert.alert('Signup Failed', 'This email is already registered');
@@ -158,7 +175,7 @@ export default function SignupScreen() {
             } else if (error.code === 'auth/weak-password') {
                 Alert.alert('Signup Failed', 'Password is too weak');
             } else {
-                Alert.alert('Signup Failed', error.message);
+                Alert.alert('Signup Failed', error.message || 'Failed to initialize database record. Please check Firestore setup.');
             }
         } finally {
             setLoading(false);
@@ -174,7 +191,10 @@ export default function SignupScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
-                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <ScrollView 
+                    contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 40) + 20, paddingTop: Math.max(insets.top, 20) + 20 }]} 
+                    showsVerticalScrollIndicator={false}
+                >
                     <View style={styles.header}>
                         <Text style={styles.title}>Create Account</Text>
                         <Text style={styles.subtitle}>Join Sosync to stay safe and connected</Text>

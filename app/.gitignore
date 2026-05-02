@@ -41,3 +41,4 @@ yarn-error.*
 /android
 
 /config/firebaseConfig.ts
+config/firebaseConfig.ts

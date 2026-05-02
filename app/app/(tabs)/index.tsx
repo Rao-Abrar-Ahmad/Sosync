@@ -56,7 +56,7 @@ export default function HomeScreen() {
             >
               <View style={styles.actionCardContent}>
                 <View style={styles.iconContainer}>
-                  <FontAwesome name="plus-circle" size={24} color="#fff" />
+                  <FontAwesome name="plus-circle" size={16} color="#fff" />
                 </View>
                 <View style={styles.actionCardText}>
                   <Text style={[styles.actionCardTitle, { color: '#fff' }]}>Create Report</Text>
@@ -64,7 +64,7 @@ export default function HomeScreen() {
                     Report a disaster in your area
                   </Text>
                 </View>
-                <FontAwesome name="arrow-right" size={18} color="#fff" />
+                <FontAwesome name="arrow-right" size={16} color="#fff" />
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -86,7 +86,7 @@ export default function HomeScreen() {
                 >
                   <FontAwesome
                     name="list"
-                    size={24}
+                    size={16}
                     color={Theme.variants.primary}
                   />
                 </View>
@@ -96,62 +96,12 @@ export default function HomeScreen() {
                     See all disaster reports
                   </Text>
                 </View>
-                <FontAwesome name="arrow-right" size={20} color={Theme.variants.primary} />
+                <FontAwesome name="arrow-right" size={16} color={Theme.variants.primary} />
               </View>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Features Section */}
-        <View style={[styles.section, loading && styles.opacityReduced]}>
-          <Text style={styles.sectionTitle}>Features</Text>
-
-          <View style={styles.featureGrid}>
-            {/* Real-time Alerts */}
-            <View style={styles.featureCard}>
-              <View style={styles.featureIconContainer}>
-                <FontAwesome name="bell" size={16} color={Theme.variants.primary} />
-              </View>
-              <Text style={styles.featureTitle}>Real-time Alerts</Text>
-              <Text style={styles.featureDescription}>
-                Get instant disaster alerts
-              </Text>
-            </View>
-
-            {/* Location Tracking */}
-            <View style={styles.featureCard}>
-              <View style={styles.featureIconContainer}>
-                <FontAwesome name="map-marker" size={16} color={Theme.variants.primary} />
-              </View>
-              <Text style={styles.featureTitle}>Location Tracking</Text>
-              <Text style={styles.featureDescription}>
-                Find disasters near you
-              </Text>
-            </View>
-
-            {/* Community Reports */}
-            <View style={styles.featureCard}>
-              <View style={styles.featureIconContainer}>
-                <FontAwesome name="users" size={16} color={Theme.variants.primary} />
-              </View>
-              <Text style={styles.featureTitle}>Community Reports</Text>
-              <Text style={styles.featureDescription}>
-                Verify reports together
-              </Text>
-            </View>
-
-            {/* Emergency SOS */}
-            <View style={styles.featureCard}>
-              <View style={styles.featureIconContainer}>
-                <FontAwesome name="phone" size={16} color={Theme.variants.primary} />
-              </View>
-              <Text style={styles.featureTitle}>Emergency SOS</Text>
-              <Text style={styles.featureDescription}>
-                Call for help quickly
-              </Text>
-            </View>
-          </View>
-        </View>
 
         {/* Info Card */}
         <View style={[styles.infoCard, loading && styles.opacityReduced]}>
@@ -241,14 +191,14 @@ const styles = StyleSheet.create({
   },
   actionCardTitle: {
     fontFamily: Theme.typography.inter.bold,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: Theme.variants.text,
     marginBottom: 2,
   },
   actionCardDescription: {
     fontFamily: Theme.typography.inter.regular,
-    fontSize: 13,
+    fontSize: 12,
     color: Theme.variants.textMuted,
   },
   featureGrid: {
