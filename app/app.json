@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/welcome.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#3581b8"
     },
     "ios": {
@@ -42,9 +42,7 @@
       [
         "expo-font",
         {
-          "fonts": [
-            "./assets/fonts/Geom.ttf"
-          ],
+          "fonts": ["./assets/fonts/Geom.ttf"],
           "android": {
             "fonts": [
               {
@@ -59,9 +57,7 @@
             ]
           },
           "ios": {
-            "fonts": [
-              "./assets/fonts/Geom.ttf"
-            ]
+            "fonts": ["./assets/fonts/Geom.ttf"]
           }
         }
       ],
