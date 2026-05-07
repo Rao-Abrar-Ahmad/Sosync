@@ -81,6 +81,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="create-report"
+        options={{
+          tabBarButton: () => null,
+          title: 'Create Report',
+        }}
+      />
     </Tabs>
   );
 }

@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -38,11 +38,12 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+  // We will hide the splash screen in AuthHandler once Firebase finishes loading
+  // useEffect(() => {
+  //   if (loaded) {
+  //     SplashScreen.hideAsync();
+  //   }
+  // }, [loaded]);
 
   if (!loaded) {
     return null;
@@ -51,50 +52,77 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+import { useUser } from '@/context/UserContext';
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const [user, setUser] = useState<User | null>(null);
-  const [initializing, setInitializing] = useState(true);
-  const router = useRouter();
-  const segments = useSegments();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      if (initializing) setInitializing(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    if (initializing) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-    const inOnboardingGroup = segments[0] === '(onboarding)';
-
-    if (!user && !inAuthGroup && !inOnboardingGroup) {
-      // Redirect to welcome if not logged in and not in onboarding/auth flow
-      router.replace('/(onboarding)/welcome');
-    } else if (user && (inAuthGroup || inOnboardingGroup)) {
-      // Redirect to main tabs if logged in and trying to access onboarding/auth
-      router.replace('/(tabs)');
-    }
-  }, [user, segments, initializing]);
-
-  if (initializing) return null;
 
   return (
     <UserProvider>
       <SafeAreaProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }}>
-            <Stack.Screen name="(onboarding)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-          </Stack>
+          <AuthHandler />
         </ThemeProvider>
       </SafeAreaProvider>
     </UserProvider>
+  );
+}
+
+function AuthHandler() {
+  const { user, loading } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
+  const segments = useSegments();
+
+  useEffect(() => {
+
+    console.log(pathname);
+    if (loading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inOnboardingGroup = segments[0] === '(onboarding)';
+
+    if (!user) {
+      if (!inAuthGroup && !inOnboardingGroup) {
+        // Redirect to welcome if not logged in and not in onboarding/auth flow
+        router.replace('/(onboarding)/welcome');
+      }
+    } else {
+      // User is logged in
+      if (user.onboarding_completed === false) {
+        // If onboarding is not complete, ensure they are in the onboarding flow (but not welcome/get-started)
+        if (!inOnboardingGroup || segments[1] === 'welcome' || segments[1] === 'get-started') {
+          router.replace('/(onboarding)/allow-gps');
+        }
+      } else {
+        // If onboarding is complete, prevent access to auth and onboarding screens
+        if (inAuthGroup || inOnboardingGroup) {
+          if (user.role === 'ADMIN') {
+            router.replace('/admin' as any);
+          } else {
+            router.replace('/(tabs)');
+          }
+        }
+      }
+    }
+  }, [user, loading, segments]);
+
+  // Hide splash screen once Firebase is done initializing
+  useEffect(() => {
+    if (!loading) {
+      SplashScreen.hideAsync();
+    }
+  }, [loading]);
+
+  // Prevent UI flash by keeping returning null while loading
+  if (loading) return null;
+
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }}>
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+      <Stack.Screen name="admin" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+    </Stack>
   );
 }

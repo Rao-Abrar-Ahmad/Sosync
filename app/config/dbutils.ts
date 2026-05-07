@@ -20,6 +20,7 @@ export interface UserDocument {
   profile_picture: string;
   role: 'USER' | 'ADMIN' | 'RESPONDER';
   is_active: boolean;
+  onboarding_completed: boolean;
   auth_provider: 'email' | 'google' | 'phone';
   location_permission_granted?: boolean;
   last_known_location?: {
@@ -254,6 +255,13 @@ export async function activateUserAccount(userId: string): Promise<void> {
 export type DisasterType = 'FLOOD' | 'EARTHQUAKE' | 'FIRE' | 'ACCIDENT' | 'LANDSLIDE' | 'OTHER';
 export type ReportStatus = 'PENDING' | 'VERIFIED' | 'RESOLVED' | 'FALSE_ALARM';
 
+export interface ReportMediaItem {
+  type: 'image' | 'video';
+  url: string;
+  file_name: string;
+  uploaded_at: Timestamp | Date;
+}
+
 export interface DisasterReportDocument {
   id: string;
   user_id: string;
@@ -264,6 +272,7 @@ export interface DisasterReportDocument {
   longitude: number;
   address?: string;
   severity_level?: string;
+  media?: ReportMediaItem[];
   created_at: Timestamp | Date;
   updated_at?: Timestamp | Date;
 }
@@ -361,7 +370,7 @@ export async function getAllDisasterReports(): Promise<DisasterReportDocument[]>
     const reportsCollectionRef = collection(db, 'disaster_reports');
     const q = query(reportsCollectionRef, orderBy('created_at', 'desc'));
     const querySnapshot = await getDocs(q);
-
+    console.log('Fetched disaster reports:', querySnapshot.size);
     const reports: DisasterReportDocument[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();

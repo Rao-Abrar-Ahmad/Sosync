@@ -12,12 +12,15 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { createDisasterReport, DisasterType } from '@/config/dbutils';
+import * as ImagePicker from 'expo-image-picker';
+import { createDisasterReport, DisasterType, updateDisasterReport } from '@/config/dbutils';
+import { storage } from '@/config/firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useUser } from '@/context/UserContext';
 import Theme from '@/config/theme';
 import Input from '@/components/Input';
@@ -38,6 +41,11 @@ export default function CreateReportScreen() {
   const [severity, setSeverity] = useState('Medium');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [selectedMedia, setSelectedMedia] = useState<{
+    uri: string;
+    mediaType: 'image' | 'video';
+    fileName: string;
+  }[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -54,6 +62,32 @@ export default function CreateReportScreen() {
   const fetchCurrentLocation = async () => {
     try {
       setFetchingLocation(true);
+
+      // Check if location services are enabled
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert(
+          'Location Services Disabled',
+          'Please enable location services on your device to fetch your current location.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Location.enableNetworkProviderAsync() },
+          ]
+        );
+        return;
+      }
+
+      // Request permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission is required to create reports. Please grant permission in your device settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -106,6 +140,65 @@ export default function CreateReportScreen() {
     return true;
   };
 
+  const pickMedia = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.status !== 'granted') {
+        Alert.alert('Permission denied', 'Media library access is required to add images or videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const pickedAssets = result.assets.map((asset) => ({
+        uri: asset.uri,
+        mediaType: asset.type === 'video' ? 'video' : 'image',
+        fileName: asset.fileName || `media_${Date.now()}.${asset.uri.split('.').pop() ?? 'jpg'}`,
+      }));
+
+      setSelectedMedia((prev: any) => [...prev, ...pickedAssets].slice(0, 5));
+    } catch (error) {
+      console.error('Media picker error:', error);
+      Alert.alert('Error', 'Unable to select media. Please try again.');
+    }
+  };
+
+  const removeMediaItem = (uri: string) => {
+    setSelectedMedia((prev) => prev.filter((item) => item.uri !== uri));
+  };
+
+  const uploadMediaFiles = async (reportId: string) => {
+    const uploadedMedia = await Promise.all(
+      selectedMedia.map(async (asset) => {
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const extension = asset.fileName.split('.').pop() || (asset.mediaType === 'video' ? 'mp4' : 'jpg');
+        const storageFileName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+        const storageRef = ref(storage, `disaster_reports/${reportId}/${storageFileName}`);
+
+        await uploadBytes(storageRef, blob);
+        const url = await getDownloadURL(storageRef);
+
+        return {
+          type: asset.mediaType,
+          url,
+          file_name: storageFileName,
+          uploaded_at: new Date(),
+        };
+      })
+    );
+
+    return uploadedMedia;
+  };
+
   // Submit report
   const handleSubmit = async () => {
     if (!validateForm()) {
@@ -131,6 +224,11 @@ export default function CreateReportScreen() {
         severity_level: severity || undefined,
       });
 
+      if (selectedMedia.length > 0) {
+        const mediaItems = await uploadMediaFiles(reportId);
+        await updateDisasterReport(reportId, { media: mediaItems });
+      }
+
       Alert.alert('Success', 'Disaster report created successfully!', [
         {
           text: 'View Home',
@@ -146,10 +244,7 @@ export default function CreateReportScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={Theme.backgrounds.white as any}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -253,6 +348,43 @@ export default function CreateReportScreen() {
               onChangeText={setAddress}
               editable={!loading}
             />
+          </View>
+
+          {/* Media Upload */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Add Images or Videos</Text>
+            <TouchableOpacity
+              style={styles.mediaButton}
+              onPress={pickMedia}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              <FontAwesome name="camera" size={16} color="#fff" />
+              <Text style={styles.mediaButtonText}>Add media</Text>
+            </TouchableOpacity>
+
+            {selectedMedia.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaPreviewRow}>
+                {selectedMedia.map((item) => (
+                  <View key={item.uri} style={styles.mediaPreviewItem}>
+                    {item.mediaType === 'image' ? (
+                      <Image source={{ uri: item.uri }} style={styles.mediaPreviewImage} />
+                    ) : (
+                      <View style={styles.mediaPreviewVideo}>
+                        <FontAwesome name="video-camera" size={24} color="#fff" />
+                        <Text style={styles.mediaPreviewVideoText}>Video</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.removeMediaButton}
+                      onPress={() => removeMediaItem(item.uri)}
+                    >
+                      <FontAwesome name="times" size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
 
           {/* Severity Level */}
@@ -398,7 +530,7 @@ export default function CreateReportScreen() {
           </View>
         </View>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -519,6 +651,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  mediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.variants.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  mediaButtonText: {
+    fontFamily: Theme.typography.inter.semibold,
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 8,
+  },
+  mediaPreviewRow: {
+    marginTop: 12,
+  },
+  mediaPreviewItem: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    position: 'relative',
+    backgroundColor: Theme.variants.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaPreviewVideo: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#222',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPreviewVideoText: {
+    fontFamily: Theme.typography.inter.semibold,
+    fontSize: 12,
+    color: '#fff',
+    marginTop: 6,
+  },
+  removeMediaButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.6,

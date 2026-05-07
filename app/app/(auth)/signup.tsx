@@ -89,6 +89,7 @@ export default function SignupScreen() {
                         profile_picture: user.photoURL || '',
                         role: 'USER',
                         is_active: true,
+                        onboarding_completed: false,
                         auth_provider: 'google',
                     });
                 } catch (dbError) {
@@ -99,7 +100,7 @@ export default function SignupScreen() {
             }
 
             Alert.alert('Success', 'Account created successfully!', [
-                { text: 'OK', onPress: () => router.replace('/(onboarding)/complete-profile') }
+                { text: 'OK', onPress: () => router.replace('/(onboarding)/allow-gps') }
             ]);
         } catch (error: any) {
             console.error('Google Sign-Up Error:', error);
@@ -149,11 +150,12 @@ export default function SignupScreen() {
                 profile_picture: '',
                 role: 'USER',
                 is_active: true,
+                onboarding_completed: false,
                 auth_provider: 'email',
             });
 
             Alert.alert('Success', 'Account created successfully!', [
-                { text: 'OK', onPress: () => router.replace('/(onboarding)/complete-profile') }
+                { text: 'OK', onPress: () => router.replace('/(onboarding)/allow-gps') }
             ]);
         } catch (error: any) {
             console.error('Signup Error:', error);

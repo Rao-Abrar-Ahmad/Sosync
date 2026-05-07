@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": ["sosync", "com.sosync.sosync"],
+    "scheme": [
+      "sosync",
+      "com.sosync.sosync"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -42,7 +45,9 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/Geom.ttf"],
+          "fonts": [
+            "./assets/fonts/Geom.ttf"
+          ],
           "android": {
             "fonts": [
               {
@@ -57,7 +62,9 @@
             ]
           },
           "ios": {
-            "fonts": ["./assets/fonts/Geom.ttf"]
+            "fonts": [
+              "./assets/fonts/Geom.ttf"
+            ]
           }
         }
       ],
@@ -69,7 +76,8 @@
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location while you are using the app.",
           "isAndroidBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "expo-maps"
     ],
     "experiments": {
       "typedRoutes": true

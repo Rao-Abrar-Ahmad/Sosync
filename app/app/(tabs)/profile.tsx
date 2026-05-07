@@ -4,6 +4,7 @@ import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
 import { TouchableOpacity, Image } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import * as Location from 'expo-location';
 import Theme from '@/config/theme';
 import { useUser } from '@/context/UserContext';
 import { signOut } from 'firebase/auth';
@@ -48,15 +49,25 @@ export default function ProfileScreen() {
     Alert.alert('Edit Profile', 'Edit profile feature coming soon!');
   };
 
-  const handleGPSPermissions = () => {
-    Alert.alert(
-      'GPS Location Permissions',
-      'Would you like to enable location services for this app?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Enable', onPress: () => Alert.alert('Success', 'Location permissions enabled!') },
-      ]
-    );
+  const handleGPSPermissions = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status === 'granted') {
+        Alert.alert('Success', 'Location permissions have been granted!');
+      } else if (status === 'denied') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission was denied. You can enable it later in your device settings.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Permission Required', 'Location permission is needed for location-based features.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to request location permissions.');
+      console.error('Permission error:', error);
+    }
   };
 
   const handleTermsAndConditions = () => {

@@ -7,6 +7,7 @@ import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/config/firebaseConfig';
 import { useUser } from '@/context/UserContext';
+import { updateUserProfile } from '@/config/dbutils';
 import Theme from '@/config/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
@@ -23,8 +24,17 @@ export default function CompleteProfileScreen() {
     const handleProceed = async () => {
         try {
             setLoading(true);
-            // Profile is already set up during signup, just proceed
-            router.push('/(onboarding)/allow-gps');
+            if (user?.uid) {
+                // Set onboarding completed
+                await updateUserProfile(user.uid, { onboarding_completed: true });
+            }
+
+            // Route based on role
+            if (user?.role === 'ADMIN') {
+                router.replace('/admin' as any);
+            } else {
+                router.replace('/(tabs)');
+            }
         } catch (error) {
             console.error('Error proceeding:', error);
             Alert.alert('Error', 'Failed to proceed. Please try again.');
@@ -34,8 +44,26 @@ export default function CompleteProfileScreen() {
     };
 
     // Handle skip profile picture
-    const handleSkip = () => {
-        router.push('/(onboarding)/allow-gps');
+    const handleSkip = async () => {
+        try {
+            setLoading(true);
+            if (user?.uid) {
+                // Set onboarding completed
+                await updateUserProfile(user.uid, { onboarding_completed: true });
+            }
+
+            // Route based on role
+            if (user?.role === 'ADMIN') {
+                router.replace('/admin' as any);
+            } else {
+                router.replace('/(tabs)');
+            }
+        } catch (error) {
+            console.error('Error skipping:', error);
+            Alert.alert('Error', 'Failed to skip. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Handle upload image (static for now)

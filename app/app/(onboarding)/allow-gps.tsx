@@ -85,8 +85,8 @@ export default function AllowGPSScreen() {
     // Proceed to home
     const proceedToHome = async () => {
         try {
-            // Clear onboarding stack and go to home
-            router.replace('/(tabs)');
+            // Go to the final complete profile step
+            router.replace('/(onboarding)/complete-profile');
         } catch (error) {
             console.error('Error navigating to home:', error);
             Alert.alert('Error', 'Failed to navigate to home. Please try again.');

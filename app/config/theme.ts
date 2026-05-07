@@ -106,6 +106,7 @@ export const Theme = {
     steelBlue: Colors.steelBlue,
     sandyBrown: Colors.sandyBrown,
     softLinen: Colors.softLinen,
+    danger: "#ff4444",
   },
   backgrounds: {
     // first main screen bg linear gradiant, 0% albaster, 58% mint, 100% steel blue

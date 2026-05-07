@@ -19,6 +19,7 @@ interface UserData {
   profile_picture?: string;
   role?: string;
   is_active?: boolean;
+  onboarding_completed?: boolean;
   auth_provider?: string;
   location_permission_granted?: boolean;
   last_known_location?: {
