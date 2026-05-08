@@ -1,4 +1,5 @@
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Animated, Easing } from 'react-native';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +11,19 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, loading } = useUser();
+
+  // SOS button pulse animation
+  const sosPulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sosPulse, { toValue: 1.1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(sosPulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
 
   return (
     <LinearGradient
@@ -111,6 +125,19 @@ export default function HomeScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Floating SOS Button */}
+      <Animated.View style={[styles.sosFloating, { transform: [{ scale: sosPulse }] }]}>
+        <TouchableOpacity
+          style={styles.sosFloatingBtn}
+          onPress={() => router.push('/(tabs)/sos')}
+          activeOpacity={0.7}
+          disabled={loading}
+        >
+          <FontAwesome name="exclamation-triangle" size={22} color="#fff" />
+          <Text style={styles.sosFloatingTxt}>SOS</Text>
+        </TouchableOpacity>
+      </Animated.View>
     </LinearGradient>
   );
 }
@@ -283,5 +310,31 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
     pointerEvents: 'none',
+  },
+  // Floating SOS
+  sosFloating: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    zIndex: 100,
+  },
+  sosFloatingBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ff4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sosFloatingTxt: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 1,
   },
 });

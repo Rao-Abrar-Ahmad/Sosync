@@ -88,6 +88,27 @@ export default function TabLayout() {
           title: 'Create Report',
         }}
       />
+      <Tabs.Screen
+        name="edit-profile"
+        options={{
+          tabBarButton: () => null,
+          title: 'Edit Profile',
+        }}
+      />
+      <Tabs.Screen
+        name="emergency-contacts"
+        options={{
+          tabBarButton: () => null,
+          title: 'Emergency Contacts',
+        }}
+      />
+      <Tabs.Screen
+        name="sos"
+        options={{
+          tabBarButton: () => null,
+          title: 'SOS Emergency',
+        }}
+      />
     </Tabs>
   );
 }

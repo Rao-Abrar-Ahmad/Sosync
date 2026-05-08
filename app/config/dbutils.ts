@@ -1,4 +1,4 @@
-import { doc, setDoc, updateDoc, getDoc, serverTimestamp, Timestamp, collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, deleteDoc, serverTimestamp, Timestamp, collection, query, getDocs, orderBy, where } from 'firebase/firestore';
 import { db } from '@/config/firebaseConfig';
 
 
@@ -385,6 +385,270 @@ export async function getAllDisasterReports(): Promise<DisasterReportDocument[]>
     return reports;
   } catch (error) {
     console.error('Error fetching disaster reports:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// PHONE NUMBER VALIDATION
+// ============================================================================
+
+/**
+ * Validate phone number format
+ * Accepts formats: +1234567890, 1234567890, 123-456-7890, (123) 456-7890
+ * Minimum 10 digits required
+ * @param phoneNumber - Phone number to validate
+ * @returns Boolean indicating if phone number is valid
+ */
+export function isValidPhoneNumber(phoneNumber: string): boolean {
+  // Remove all non-digit characters except +
+  const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+  // Must have at least 10 digits (with or without country code)
+  const digitCount = cleaned.replace(/\+/g, '').length;
+  return digitCount >= 10 && digitCount <= 15;
+}
+
+/**
+ * Format phone number for storage (strip non-digit chars, keep +)
+ * @param phoneNumber - Raw phone number input
+ * @returns Cleaned phone number
+ */
+export function formatPhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/[^\d+]/g, '');
+}
+
+// ============================================================================
+// EMERGENCY CONTACTS MANAGEMENT
+// ============================================================================
+
+export interface EmergencyContactDocument {
+  id: string;
+  user_id: string;
+  name: string;
+  email?: string;
+  phone_number: string;
+  is_active: boolean;
+  created_at: Timestamp | Date;
+}
+
+export type EmergencyContactInput = Omit<EmergencyContactDocument, 'id' | 'created_at'>;
+
+/**
+ * Add a new emergency contact for a user
+ * @param contactData - Emergency contact information
+ * @returns Promise with the created contact ID
+ */
+export async function addEmergencyContact(
+  contactData: EmergencyContactInput
+): Promise<string> {
+  try {
+    const contactId = generateUniqueId();
+    const contactRef = doc(db, 'emergency_contacts', contactId);
+
+    await setDoc(contactRef, {
+      id: contactId,
+      ...contactData,
+      phone_number: formatPhoneNumber(contactData.phone_number),
+      created_at: serverTimestamp(),
+    });
+
+    return contactId;
+  } catch (error) {
+    console.error('Error adding emergency contact:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all emergency contacts for a user
+ * @param userId - Firebase user ID
+ * @returns Array of emergency contacts
+ */
+export async function getEmergencyContacts(userId: string): Promise<EmergencyContactDocument[]> {
+  try {
+    const contactsRef = collection(db, 'emergency_contacts');
+    const q = query(
+      contactsRef,
+      where('user_id', '==', userId)
+    );
+    const querySnapshot = await getDocs(q);
+
+    const contacts: EmergencyContactDocument[] = [];
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      contacts.push({
+        ...data,
+        created_at: data.created_at?.toDate?.() || new Date(),
+      } as EmergencyContactDocument);
+    });
+
+    // Sort client-side (newest first) to avoid composite index requirement
+    contacts.sort((a, b) => {
+      const dateA = a.created_at instanceof Date ? a.created_at.getTime() : 0;
+      const dateB = b.created_at instanceof Date ? b.created_at.getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return contacts;
+  } catch (error) {
+    console.error('Error fetching emergency contacts:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an emergency contact
+ * @param contactId - Emergency contact ID
+ * @param updates - Partial contact data to update
+ * @returns Promise that resolves when document is updated
+ */
+export async function updateEmergencyContact(
+  contactId: string,
+  updates: Partial<Omit<EmergencyContactDocument, 'id' | 'user_id' | 'created_at'>>
+): Promise<void> {
+  try {
+    const contactRef = doc(db, 'emergency_contacts', contactId);
+    const updateData: any = { ...updates };
+
+    if (updates.phone_number) {
+      updateData.phone_number = formatPhoneNumber(updates.phone_number);
+    }
+
+    await updateDoc(contactRef, updateData);
+  } catch (error) {
+    console.error('Error updating emergency contact:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an emergency contact
+ * @param contactId - Emergency contact ID
+ * @returns Promise that resolves when document is deleted
+ */
+export async function deleteEmergencyContact(contactId: string): Promise<void> {
+  try {
+    const contactRef = doc(db, 'emergency_contacts', contactId);
+    await deleteDoc(contactRef);
+  } catch (error) {
+    console.error('Error deleting emergency contact:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// SOS ALERTS MANAGEMENT
+// ============================================================================
+
+export type SOSStatus = 'ACTIVE' | 'RESOLVED';
+
+export interface SOSAlertDocument {
+  id: string;
+  user_id: string;
+  latitude: number;
+  longitude: number;
+  status: SOSStatus;
+  created_at: Timestamp | Date;
+}
+
+/**
+ * Create a new SOS alert
+ * @param userId - Firebase user ID
+ * @param latitude - Current latitude
+ * @param longitude - Current longitude
+ * @returns Promise with the created SOS alert ID
+ */
+export async function createSOSAlert(
+  userId: string,
+  latitude: number,
+  longitude: number
+): Promise<string> {
+  try {
+    const alertId = generateUniqueId();
+    const alertRef = doc(db, 'sos_alerts', alertId);
+
+    await setDoc(alertRef, {
+      id: alertId,
+      user_id: userId,
+      latitude,
+      longitude,
+      status: 'ACTIVE',
+      created_at: serverTimestamp(),
+    });
+
+    return alertId;
+  } catch (error) {
+    console.error('Error creating SOS alert:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update the live location of an active SOS alert
+ * @param alertId - SOS alert ID
+ * @param latitude - Updated latitude
+ * @param longitude - Updated longitude
+ * @returns Promise that resolves when document is updated
+ */
+export async function updateSOSLocation(
+  alertId: string,
+  latitude: number,
+  longitude: number
+): Promise<void> {
+  try {
+    const alertRef = doc(db, 'sos_alerts', alertId);
+    await updateDoc(alertRef, {
+      latitude,
+      longitude,
+    });
+  } catch (error) {
+    console.error('Error updating SOS location:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deactivate an SOS alert
+ * @param alertId - SOS alert ID
+ * @returns Promise that resolves when document is updated
+ */
+export async function deactivateSOSAlert(alertId: string): Promise<void> {
+  try {
+    const alertRef = doc(db, 'sos_alerts', alertId);
+    await updateDoc(alertRef, {
+      status: 'RESOLVED',
+    });
+  } catch (error) {
+    console.error('Error deactivating SOS alert:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the active SOS alert for a user (if any)
+ * @param userId - Firebase user ID
+ * @returns Active SOS alert or null
+ */
+export async function getActiveSOSAlert(userId: string): Promise<SOSAlertDocument | null> {
+  try {
+    const alertsRef = collection(db, 'sos_alerts');
+    const q = query(
+      alertsRef,
+      where('user_id', '==', userId)
+    );
+    const querySnapshot = await getDocs(q);
+
+    // Filter for ACTIVE status client-side to avoid composite index
+    const activeDoc = querySnapshot.docs.find(d => d.data().status === 'ACTIVE');
+    if (!activeDoc) return null;
+
+    const data = activeDoc.data();
+    return {
+      ...data,
+      created_at: data.created_at?.toDate?.() || new Date(),
+    } as SOSAlertDocument;
+  } catch (error) {
+    console.error('Error fetching active SOS alert:', error);
     throw error;
   }
 }
