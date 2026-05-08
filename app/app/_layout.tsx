@@ -49,7 +49,11 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <UserProvider>
+      <RootLayoutNav />
+    </UserProvider>
+  );
 }
 
 import { useUser } from '@/context/UserContext';
@@ -58,13 +62,11 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <UserProvider>
-      <SafeAreaProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <AuthHandler />
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </UserProvider>
+    <SafeAreaProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AuthHandler />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -81,7 +83,7 @@ function AuthHandler() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
-
+    //console.log('User inside main layout:', user);
     if (!user) {
       if (!inAuthGroup && !inOnboardingGroup) {
         // Redirect to welcome if not logged in and not in onboarding/auth flow
@@ -89,7 +91,7 @@ function AuthHandler() {
       }
     } else {
       // User is logged in
-      if (user.onboarding_completed === false) {
+      if (user?.onboarding_completed === false) {
         // If onboarding is not complete, ensure they are in the onboarding flow (but not welcome/get-started)
         if (!inOnboardingGroup || segments[1] === 'welcome' || segments[1] === 'get-started') {
           router.replace('/(onboarding)/allow-gps');

@@ -25,7 +25,7 @@ interface UserData {
   last_known_location?: {
     latitude: number;
     longitude: number;
-    accuracy: number;
+    accuracy: number | null;
   };
   location_permission_granted_at?: Date;
   created_at?: Date;
@@ -101,10 +101,18 @@ function userReducer(state: UserState, action: UserAction): UserState {
   }
 }
 
-const UserContext = createContext<UserState | undefined>(undefined);
+interface UserContextType extends UserState {
+  updateUser: (updates: Partial<UserData>) => void;
+}
+
+const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(userReducer, initialState);
+
+  const updateUser = (updates: Partial<UserData>) => {
+    dispatch({ type: 'UPDATE_USER', payload: updates });
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -153,7 +161,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <UserContext.Provider value={{ ...state }}>
+    <UserContext.Provider value={{ ...state, updateUser } as UserContextType}>
       {children}
     </UserContext.Provider>
   );

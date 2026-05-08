@@ -179,6 +179,7 @@ export async function updateUserLocation(
     
     await updateDoc(userDocRef, {
       location_permission_granted: true,
+      onboarding_completed:true,
       last_known_location: {
         latitude,
         longitude,

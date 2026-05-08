@@ -5,10 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": [
-      "sosync",
-      "com.sosync.sosync"
-    ],
+    "scheme": ["sosync", "com.sosync.sosync"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -33,7 +30,12 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
-      "package": "com.sosync.sosync"
+      "package": "com.sosync.sosync",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDvXSwQGqtHewuyEEMUGgtYiNbRZWcG55A"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -45,9 +47,7 @@
       [
         "expo-font",
         {
-          "fonts": [
-            "./assets/fonts/Geom.ttf"
-          ],
+          "fonts": ["./assets/fonts/Geom.ttf"],
           "android": {
             "fonts": [
               {
@@ -62,9 +62,7 @@
             ]
           },
           "ios": {
-            "fonts": [
-              "./assets/fonts/Geom.ttf"
-            ]
+            "fonts": ["./assets/fonts/Geom.ttf"]
           }
         }
       ],
@@ -77,7 +75,8 @@
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

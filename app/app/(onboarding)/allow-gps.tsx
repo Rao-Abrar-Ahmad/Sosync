@@ -14,7 +14,8 @@ export default function AllowGPSScreen() {
     const [locationGranted, setLocationGranted] = useState(false);
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { user } = useUser();
+    const { user, updateUser } = useUser();
+    //console.log('user inside allowgps: ', user)
 
     // Request GPS permission
     const handleRequestPermission = async () => {
@@ -23,7 +24,7 @@ export default function AllowGPSScreen() {
 
             // Request foreground location permission
             const { status } = await Location.requestForegroundPermissionsAsync();
-
+            console.log('location status', status)
             if (status === 'granted') {
                 // Permission granted
                 setLocationGranted(true);
@@ -32,7 +33,7 @@ export default function AllowGPSScreen() {
                 const location = await Location.getCurrentPositionAsync({
                     accuracy: Location.Accuracy.Balanced,
                 });
-
+                console.log('user location', location)
                 // Save location permission status and coordinates to Firestore using utility
                 if (user?.uid) {
                     await updateUserLocation(
@@ -41,6 +42,17 @@ export default function AllowGPSScreen() {
                         location.coords.longitude,
                         location.coords.accuracy
                     );
+
+                    // Update the context with the new user information
+                    updateUser({
+                        location_permission_granted: true,
+                        last_known_location: {
+                            latitude: location.coords.latitude,
+                            longitude: location.coords.longitude,
+                            accuracy: location.coords.accuracy,
+                        },
+                        location_permission_granted_at: new Date(),
+                    });
                 }
 
                 Alert.alert(
@@ -177,7 +189,7 @@ export default function AllowGPSScreen() {
 
                 {/* Proceed Button */}
                 <TouchableOpacity
-                    style={[styles.proceedButton, (loading || !locationGranted) && styles.buttonDisabled]}
+                    style={[styles.proceedButton, (loading) && styles.buttonDisabled]}
                     onPress={locationGranted ? proceedToHome : handleRequestPermission}
                     disabled={loading}
                 >

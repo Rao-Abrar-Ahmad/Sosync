@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,21 +12,22 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
-import { createDisasterReport, DisasterType } from '@/config/dbutils';
+import * as ImagePicker from 'expo-image-picker';
+import { createDisasterReport, DisasterType, updateDisasterReport } from '@/config/dbutils';
+import { storage } from '@/config/firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useUser } from '@/context/UserContext';
 import Theme from '@/config/theme';
+import Input from '@/components/Input';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 const DISASTER_TYPES: DisasterType[] = ['FLOOD', 'EARTHQUAKE', 'FIRE', 'ACCIDENT', 'LANDSLIDE', 'OTHER'];
 const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
-
-// Default location (Pakistan center)
-const DEFAULT_COORDS = { latitude: 30.3753, longitude: 69.3451 };
 
 export default function CreateReportScreen() {
   const router = useRouter();
@@ -38,38 +39,36 @@ export default function CreateReportScreen() {
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [severity, setSeverity] = useState('Medium');
-
-  // Location state (numeric, not strings)
-  const [markerCoords, setMarkerCoords] = useState(DEFAULT_COORDS);
-  const [gpsCoords, setGpsCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [selectedMedia, setSelectedMedia] = useState<{
+    uri: string;
+    mediaType: 'image' | 'video';
+    fileName: string;
+  }[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(false);
-  const [fetchingLocation, setFetchingLocation] = useState(true);
-  const [reverseGeoLoading, setReverseGeoLoading] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [severityModalVisible, setSeverityModalVisible] = useState(false);
 
-  // Fetch current GPS location on mount
+  // Fetch current location on mount
   useEffect(() => {
     fetchCurrentLocation();
   }, []);
 
-  // Reverse geocode whenever marker moves
-  useEffect(() => {
-    reverseGeocode(markerCoords.latitude, markerCoords.longitude);
-  }, [markerCoords]);
-
-  // Fetch current GPS location
+  // Fetch current location
   const fetchCurrentLocation = async () => {
     try {
       setFetchingLocation(true);
 
+      // Check if location services are enabled
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
         Alert.alert(
           'Location Services Disabled',
-          'Please enable location services to auto-detect your location.',
+          'Please enable location services on your device to fetch your current location.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => Location.enableNetworkProviderAsync() },
@@ -78,11 +77,12 @@ export default function CreateReportScreen() {
         return;
       }
 
+      // Request permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           'Permission Denied',
-          'Location permission is required. You can still tap on the map to set the location.',
+          'Location permission is required to create reports. Please grant permission in your device settings.',
           [{ text: 'OK' }]
         );
         return;
@@ -92,66 +92,13 @@ export default function CreateReportScreen() {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      const coords = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-
-      setGpsCoords(coords);
-      setMarkerCoords(coords);
+      setLatitude(location.coords.latitude.toString());
+      setLongitude(location.coords.longitude.toString());
     } catch (error) {
       console.error('Error fetching location:', error);
-      Alert.alert('Location Error', 'Could not fetch your location. Tap on the map to set it manually.');
+      Alert.alert('Location Error', 'Could not fetch your location. Please enter it manually.');
     } finally {
       setFetchingLocation(false);
-    }
-  };
-
-  // Reverse geocode coordinates to address
-  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
-    try {
-      setReverseGeoLoading(true);
-      const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-
-      if (results && results.length > 0) {
-        const place = results[0];
-        const parts = [
-          place.name,
-          place.street,
-          place.district,
-          place.city,
-          place.region,
-          place.country,
-        ].filter(Boolean);
-
-        // Remove duplicates while preserving order
-        const unique = [...new Set(parts)];
-        setAddress(unique.join(', '));
-      } else {
-        setAddress('');
-      }
-    } catch (error) {
-      console.error('Reverse geocode error:', error);
-      // Don't overwrite existing address on error
-    } finally {
-      setReverseGeoLoading(false);
-    }
-  }, []);
-
-  // Handle map tap — move marker to tapped location
-  const handleMapClick: any = (event: { coordinates: { latitude: number; longitude: number } }) => {
-    setMarkerCoords({
-      latitude: event.coordinates.latitude,
-      longitude: event.coordinates.longitude,
-    });
-  };
-
-  // Re-center map to GPS location
-  const handleRecenterGPS = () => {
-    if (gpsCoords) {
-      setMarkerCoords(gpsCoords);
-    } else {
-      fetchCurrentLocation();
     }
   };
 
@@ -167,17 +114,96 @@ export default function CreateReportScreen() {
       return false;
     }
 
-    if (!markerCoords.latitude || !markerCoords.longitude) {
-      Alert.alert('Validation Error', 'Please set a location on the map');
+    if (!latitude || !longitude) {
+      Alert.alert('Validation Error', 'Please provide latitude and longitude');
+      return false;
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      Alert.alert('Validation Error', 'Latitude and longitude must be valid numbers');
+      return false;
+    }
+
+    if (lat < -90 || lat > 90) {
+      Alert.alert('Validation Error', 'Latitude must be between -90 and 90');
+      return false;
+    }
+
+    if (lng < -180 || lng > 180) {
+      Alert.alert('Validation Error', 'Longitude must be between -180 and 180');
       return false;
     }
 
     return true;
   };
 
+  const pickMedia = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.status !== 'granted') {
+        Alert.alert('Permission denied', 'Media library access is required to add images or videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const pickedAssets = result.assets.map((asset) => ({
+        uri: asset.uri,
+        mediaType: asset.type === 'video' ? 'video' : 'image',
+        fileName: asset.fileName || `media_${Date.now()}.${asset.uri.split('.').pop() ?? 'jpg'}`,
+      }));
+
+      setSelectedMedia((prev: any) => [...prev, ...pickedAssets].slice(0, 5));
+    } catch (error) {
+      console.error('Media picker error:', error);
+      Alert.alert('Error', 'Unable to select media. Please try again.');
+    }
+  };
+
+  const removeMediaItem = (uri: string) => {
+    setSelectedMedia((prev) => prev.filter((item) => item.uri !== uri));
+  };
+
+  const uploadMediaFiles = async (reportId: string) => {
+    const uploadedMedia = await Promise.all(
+      selectedMedia.map(async (asset) => {
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const extension = asset.fileName.split('.').pop() || (asset.mediaType === 'video' ? 'mp4' : 'jpg');
+        const storageFileName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+        const storageRef = ref(storage, `disaster_reports/${reportId}/${storageFileName}`);
+
+        await uploadBytes(storageRef, blob);
+        const url = await getDownloadURL(storageRef);
+
+        return {
+          type: asset.mediaType,
+          url,
+          file_name: storageFileName,
+          uploaded_at: new Date(),
+        };
+      })
+    );
+
+    return uploadedMedia;
+  };
+
   // Submit report
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     if (!user?.uid) {
       Alert.alert('Error', 'User not authenticated');
@@ -187,16 +213,21 @@ export default function CreateReportScreen() {
     try {
       setLoading(true);
 
-      await createDisasterReport({
+      const reportId = await createDisasterReport({
         user_id: user.uid,
         type: disasterType,
         description: description.trim(),
         status: 'PENDING',
-        latitude: markerCoords.latitude,
-        longitude: markerCoords.longitude,
-        address: address.trim() || '',
-        severity_level: severity || '',
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        address: address.trim() || undefined,
+        severity_level: severity || undefined,
       });
+
+      if (selectedMedia.length > 0) {
+        const mediaItems = await uploadMediaFiles(reportId);
+        await updateDisasterReport(reportId, { media: mediaItems });
+      }
 
       Alert.alert('Success', 'Disaster report created successfully!', [
         {
@@ -212,14 +243,6 @@ export default function CreateReportScreen() {
     }
   };
 
-  // Map component based on platform
-  const MapComponent = Platform.OS === 'ios' ? AppleMaps.View : GoogleMaps.View;
-
-  const cameraPosition = {
-    coordinates: markerCoords,
-    zoom: 15,
-  };
-
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -229,7 +252,6 @@ export default function CreateReportScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
           showsVerticalScrollIndicator={false}
-          nestedScrollEnabled
         >
           {/* Header */}
           <View style={styles.header}>
@@ -243,28 +265,16 @@ export default function CreateReportScreen() {
           {/* Form Title */}
           <Text style={styles.sectionTitle}>Report Details</Text>
 
-          {/* Disaster Type + Severity in one row */}
-          <View style={styles.rowContainer}>
-            <View style={[styles.formGroup, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.label}>Disaster Type *</Text>
-              <TouchableOpacity
-                style={styles.selectButton}
-                onPress={() => setTypeModalVisible(true)}
-              >
-                <Text style={styles.selectButtonText} numberOfLines={1}>{disasterType}</Text>
-                <FontAwesome name="chevron-down" size={12} color={Theme.variants.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Severity</Text>
-              <TouchableOpacity
-                style={styles.selectButton}
-                onPress={() => setSeverityModalVisible(true)}
-              >
-                <Text style={styles.selectButtonText} numberOfLines={1}>{severity}</Text>
-                <FontAwesome name="chevron-down" size={12} color={Theme.variants.primary} />
-              </TouchableOpacity>
-            </View>
+          {/* Disaster Type */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Disaster Type *</Text>
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={() => setTypeModalVisible(true)}
+            >
+              <Text style={styles.selectButtonText}>{disasterType}</Text>
+              <FontAwesome name="chevron-down" size={14} color={Theme.variants.primary} />
+            </TouchableOpacity>
           </View>
 
           {/* Description */}
@@ -277,84 +287,116 @@ export default function CreateReportScreen() {
               value={description}
               onChangeText={setDescription}
               multiline
-              numberOfLines={4}
+              numberOfLines={5}
               editable={!loading}
             />
           </View>
 
           {/* Location Section */}
           <Text style={styles.sectionTitle}>Location</Text>
-          <Text style={styles.locationHint}>
-            Tap anywhere on the map to set the disaster location
-          </Text>
 
-          {/* Interactive Map */}
-          <View style={styles.mapContainer}>
-            {fetchingLocation ? (
-              <View style={styles.mapLoadingOverlay}>
-                <ActivityIndicator size="large" color={Theme.variants.primary} />
-                <Text style={styles.mapLoadingText}>Detecting your location...</Text>
-              </View>
-            ) : (
-              <MapComponent
-                style={styles.map}
-                cameraPosition={cameraPosition}
-                onMapClick={handleMapClick}
-                markers={[
-                  {
-                    id: 'selected-location',
-                    coordinates: markerCoords,
-                    title: 'Report Location',
-                    snippet: address || 'Tap the map to change location',
-                  },
-                ]}
-                uiSettings={{
-                  zoomControlsEnabled: true,
-                  myLocationButtonEnabled: false,
-                }}
+          {/* Latitude & Longitude Row */}
+          <View style={styles.rowContainer}>
+            <View style={[styles.formGroup, { flex: 1, marginRight: 10 }]}>
+              <Text style={styles.label}>Latitude *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="-90 to 90"
+                placeholderTextColor={Theme.variants.textMuted}
+                value={latitude}
+                onChangeText={setLatitude}
+                keyboardType="decimal-pad"
+                editable={!loading}
               />
-            )}
-
-            {/* Re-center GPS button (floating on map) */}
-            {!fetchingLocation && (
-              <TouchableOpacity
-                style={styles.recenterButton}
-                onPress={handleRecenterGPS}
-                activeOpacity={0.8}
-              >
-                <FontAwesome name="crosshairs" size={18} color={Theme.variants.primary} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Coordinates display */}
-          <View style={styles.coordsRow}>
-            <View style={styles.coordChip}>
-              <Text style={styles.coordLabel}>Lat</Text>
-              <Text style={styles.coordValue}>{markerCoords.latitude.toFixed(5)}</Text>
             </View>
-            <View style={styles.coordChip}>
-              <Text style={styles.coordLabel}>Lng</Text>
-              <Text style={styles.coordValue}>{markerCoords.longitude.toFixed(5)}</Text>
+            <View style={[styles.formGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Longitude *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="-180 to 180"
+                placeholderTextColor={Theme.variants.textMuted}
+                value={longitude}
+                onChangeText={setLongitude}
+                keyboardType="decimal-pad"
+                editable={!loading}
+              />
             </View>
           </View>
 
-          {/* Address (auto-filled from reverse geocode) */}
+          {/* Get Current Location Button */}
+          <TouchableOpacity
+            style={[styles.locationButton, fetchingLocation && styles.buttonDisabled]}
+            onPress={fetchCurrentLocation}
+            disabled={fetchingLocation || loading}
+          >
+            {fetchingLocation ? (
+              <ActivityIndicator color={Theme.variants.primary} />
+            ) : (
+              <>
+                <FontAwesome name="location-arrow" size={16} color={Theme.variants.primary} />
+                <Text style={styles.locationButtonText}>Use Current Location</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Address */}
           <View style={styles.formGroup}>
-            <View style={styles.addressLabelRow}>
-              <Text style={styles.label}>Address</Text>
-              {reverseGeoLoading && (
-                <ActivityIndicator size="small" color={Theme.variants.primary} style={{ marginLeft: 8 }} />
-              )}
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Address will be auto-detected..."
-              placeholderTextColor={Theme.variants.textMuted}
+            <Text style={styles.label}>Address (Optional)</Text>
+            <Input
+              placeholder="Enter address or location name"
               value={address}
               onChangeText={setAddress}
               editable={!loading}
             />
+          </View>
+
+          {/* Media Upload */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Add Images or Videos</Text>
+            <TouchableOpacity
+              style={styles.mediaButton}
+              onPress={pickMedia}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              <FontAwesome name="camera" size={16} color="#fff" />
+              <Text style={styles.mediaButtonText}>Add media</Text>
+            </TouchableOpacity>
+
+            {selectedMedia.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaPreviewRow}>
+                {selectedMedia.map((item) => (
+                  <View key={item.uri} style={styles.mediaPreviewItem}>
+                    {item.mediaType === 'image' ? (
+                      <Image source={{ uri: item.uri }} style={styles.mediaPreviewImage} />
+                    ) : (
+                      <View style={styles.mediaPreviewVideo}>
+                        <FontAwesome name="video-camera" size={24} color="#fff" />
+                        <Text style={styles.mediaPreviewVideoText}>Video</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.removeMediaButton}
+                      onPress={() => removeMediaItem(item.uri)}
+                    >
+                      <FontAwesome name="times" size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Severity Level */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Severity Level</Text>
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={() => setSeverityModalVisible(true)}
+            >
+              <Text style={styles.selectButtonText}>{severity}</Text>
+              <FontAwesome name="chevron-down" size={14} color={Theme.variants.primary} />
+            </TouchableOpacity>
           </View>
 
           {/* Submit Button */}
@@ -410,14 +452,14 @@ export default function CreateReportScreen() {
                         item === 'FLOOD'
                           ? 'tint'
                           : item === 'EARTHQUAKE'
-                            ? 'bolt'
-                            : item === 'FIRE'
-                              ? 'fire'
-                              : item === 'ACCIDENT'
-                                ? 'car'
-                                : item === 'LANDSLIDE'
-                                  ? 'exclamation'
-                                  : 'question-circle'
+                          ? 'bolt'
+                          : item === 'FIRE'
+                          ? 'fire'
+                          : item === 'ACCIDENT'
+                          ? 'car'
+                          : item === 'LANDSLIDE'
+                          ? 'exclamation'
+                          : 'question-circle'
                       }
                       size={18}
                       color={Theme.variants.primary}
@@ -470,10 +512,10 @@ export default function CreateReportScreen() {
                             item === 'Low'
                               ? '#4CAF50'
                               : item === 'Medium'
-                                ? '#FF9800'
-                                : item === 'High'
-                                  ? '#F44336'
-                                  : '#8B0000',
+                              ? '#FF9800'
+                              : item === 'High'
+                              ? '#F44336'
+                              : '#8B0000',
                         },
                       ]}
                     />
@@ -495,7 +537,6 @@ export default function CreateReportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   content: {
     flexGrow: 1,
@@ -506,7 +547,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 30,
   },
   headerTitle: {
     fontFamily: Theme.typography.inter.bold,
@@ -519,20 +560,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Theme.variants.text,
-    marginBottom: 12,
-    marginTop: 8,
+    marginBottom: 16,
+    marginTop: 16,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
     fontFamily: Theme.typography.inter.medium,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: Theme.variants.text,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
@@ -554,7 +595,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Theme.variants.text,
     textAlignVertical: 'top',
-    minHeight: 100,
   },
   selectButton: {
     borderWidth: 1,
@@ -568,99 +608,29 @@ const styles = StyleSheet.create({
   },
   selectButtonText: {
     fontFamily: Theme.typography.inter.medium,
-    fontSize: 13,
+    fontSize: 14,
     color: Theme.variants.text,
-    flex: 1,
   },
   rowContainer: {
     flexDirection: 'row',
   },
-  locationHint: {
-    fontFamily: Theme.typography.inter.regular,
-    fontSize: 12,
-    color: Theme.variants.textMuted,
-    marginBottom: 10,
-    fontStyle: 'italic',
-  },
-
-  // Map styles
-  mapContainer: {
-    height: 260,
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Theme.variants.border,
-    marginBottom: 12,
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-  },
-  mapLoadingOverlay: {
-    flex: 1,
+  locationButton: {
+    borderWidth: 1.5,
+    borderColor: Theme.variants.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    gap: 8,
+    marginBottom: 20,
   },
-  mapLoadingText: {
-    marginTop: 10,
-    fontFamily: Theme.typography.inter.regular,
-    fontSize: 13,
-    color: Theme.variants.textMuted,
-  },
-  recenterButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-
-  // Coordinates display
-  coordsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  coordChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f4f8',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  coordLabel: {
+  locationButtonText: {
     fontFamily: Theme.typography.inter.semibold,
-    fontSize: 11,
+    fontSize: 14,
+    fontWeight: '600',
     color: Theme.variants.primary,
-    textTransform: 'uppercase',
-    marginRight: 8,
   },
-  coordValue: {
-    fontFamily: Theme.typography.inter.medium,
-    fontSize: 13,
-    color: Theme.variants.text,
-  },
-
-  // Address label row
-  addressLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-
-  // Submit
   submitButton: {
     backgroundColor: Theme.variants.primary,
     paddingVertical: 14,
@@ -670,7 +640,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
-    marginTop: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -683,6 +652,64 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  mediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.variants.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  mediaButtonText: {
+    fontFamily: Theme.typography.inter.semibold,
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 8,
+  },
+  mediaPreviewRow: {
+    marginTop: 12,
+  },
+  mediaPreviewItem: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    position: 'relative',
+    backgroundColor: Theme.variants.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaPreviewVideo: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#222',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPreviewVideoText: {
+    fontFamily: Theme.typography.inter.semibold,
+    fontSize: 12,
+    color: '#fff',
+    marginTop: 6,
+  },
+  removeMediaButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   buttonDisabled: {
     opacity: 0.6,
   },
@@ -693,8 +720,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
-
-  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
