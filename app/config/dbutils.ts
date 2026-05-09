@@ -1,4 +1,4 @@
-import { doc, setDoc, updateDoc, getDoc, deleteDoc, serverTimestamp, Timestamp, collection, query, getDocs, orderBy, where } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, deleteDoc, serverTimestamp, Timestamp, collection, query, getDocs, orderBy, where, onSnapshot, increment } from 'firebase/firestore';
 import { db } from '@/config/firebaseConfig';
 
 
@@ -274,6 +274,8 @@ export interface DisasterReportDocument {
   address?: string;
   severity_level?: string;
   media?: ReportMediaItem[];
+  confirm_count?: number;
+  dismiss_count?: number;
   created_at: Timestamp | Date;
   updated_at?: Timestamp | Date;
 }
@@ -295,6 +297,8 @@ export async function createDisasterReport(
     await setDoc(newReportRef, {
       id: reportId,
       ...reportData,
+      confirm_count: 0,
+      dismiss_count: 0,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
     });
@@ -387,6 +391,37 @@ export async function getAllDisasterReports(): Promise<DisasterReportDocument[]>
     console.error('Error fetching disaster reports:', error);
     throw error;
   }
+}
+
+/**
+ * Subscribe to real-time disaster reports
+ * @param callback - Function to handle the latest reports array
+ * @returns Unsubscribe function to detach the listener
+ */
+export function subscribeToDisasterReports(callback: (reports: DisasterReportDocument[]) => void): () => void {
+  const reportsCollectionRef = collection(db, 'disaster_reports');
+  const q = query(reportsCollectionRef, orderBy('created_at', 'desc'));
+
+  const unsubscribe = onSnapshot(
+    q,
+    (querySnapshot) => {
+      const reports: DisasterReportDocument[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        reports.push({
+          ...data,
+          created_at: data.created_at?.toDate?.() || new Date(),
+          updated_at: data.updated_at?.toDate?.() || undefined,
+        } as DisasterReportDocument);
+      });
+      callback(reports);
+    },
+    (error) => {
+      console.error('Error in real-time disaster reports listener:', error);
+    }
+  );
+
+  return unsubscribe;
 }
 
 // ============================================================================
@@ -649,6 +684,115 @@ export async function getActiveSOSAlert(userId: string): Promise<SOSAlertDocumen
     } as SOSAlertDocument;
   } catch (error) {
     console.error('Error fetching active SOS alert:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// VOTING & VALIDATION
+// ============================================================================
+
+export type VoteType = 'CONFIRM' | 'DISMISS';
+
+export async function getUserVoteOnReport(
+  reportId: string,
+  userId: string
+): Promise<VoteType | null> {
+  try {
+    const votesRef = collection(db, 'votes');
+    const q = query(
+      votesRef,
+      where('report_id', '==', reportId),
+      where('user_id', '==', userId)
+    );
+    const voteSnap = await getDocs(q);
+
+    if (voteSnap.empty) return null;
+    return voteSnap.docs[0].data().vote as VoteType;
+  } catch (error) {
+    console.error('Error fetching user vote:', error);
+    return null;
+  }
+}
+
+export async function voteOnReport(
+  reportId: string,
+  userId: string,
+  vote: VoteType
+): Promise<void> {
+  try {
+    const votesRef = collection(db, 'votes');
+    const q = query(
+      votesRef,
+      where('report_id', '==', reportId),
+      where('user_id', '==', userId)
+    );
+    const voteSnap = await getDocs(q);
+    const reportRef = doc(db, 'disaster_reports', reportId);
+    const reportSnap = await getDoc(reportRef);
+    
+    if (!reportSnap.exists()) throw new Error('Report not found');
+    const reportData = reportSnap.data();
+    const currentConfirm = reportData.confirm_count || 0;
+    const currentDismiss = reportData.dismiss_count || 0;
+
+    let updates: any = {
+      updated_at: serverTimestamp()
+    };
+
+    if (!voteSnap.empty) {
+      const existingVoteDoc = voteSnap.docs[0];
+      const existingVote = existingVoteDoc.data().vote as VoteType;
+
+      if (existingVote === vote) return; // No change
+
+      // Update vote record
+      await updateDoc(doc(db, 'votes', existingVoteDoc.id), {
+        vote,
+        updated_at: serverTimestamp(),
+      });
+
+      // Update counts: decrement old, increment new
+      if (vote === 'CONFIRM') {
+        updates.confirm_count = increment(1);
+        updates.dismiss_count = increment(-1);
+        if (currentConfirm + 1 >= 5 && reportData.status === 'PENDING') {
+          updates.status = 'VERIFIED';
+        }
+      } else {
+        updates.dismiss_count = increment(1);
+        updates.confirm_count = increment(-1);
+        if (currentDismiss + 1 >= 3 && reportData.status !== 'FALSE_ALARM') {
+          updates.status = 'FALSE_ALARM';
+        }
+      }
+    } else {
+      // New vote
+      const newVoteRef = doc(collection(db, 'votes'));
+      await setDoc(newVoteRef, {
+        id: newVoteRef.id,
+        report_id: reportId,
+        user_id: userId,
+        vote,
+        created_at: serverTimestamp(),
+      });
+
+      if (vote === 'CONFIRM') {
+        updates.confirm_count = increment(1);
+        if (currentConfirm + 1 >= 5 && reportData.status === 'PENDING') {
+          updates.status = 'VERIFIED';
+        }
+      } else {
+        updates.dismiss_count = increment(1);
+        if (currentDismiss + 1 >= 3 && reportData.status !== 'FALSE_ALARM') {
+          updates.status = 'FALSE_ALARM';
+        }
+      }
+    }
+
+    await updateDoc(reportRef, updates);
+  } catch (error) {
+    console.error('Error voting on report:', error);
     throw error;
   }
 }

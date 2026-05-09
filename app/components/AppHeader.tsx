@@ -12,8 +12,9 @@ const AppHeader = () => {
   const insets = useSafeAreaInsets();
 
   // Get user's first name or email
-  const displayName = user?.displayName
-    ? user.displayName : user?.email?.split("@")[0] || "User";
+  const getUsername = () => {
+    return user?.first_name + " " + user?.last_name;
+  }
 
   // Format greeting based on time of day
   const getGreeting = () => {
@@ -33,9 +34,9 @@ const AppHeader = () => {
           activeOpacity={0.7}
         >
           <View style={styles.avatarContainer}>
-            {user?.photoURL ? (
+            {user?.profile_picture ? (
               <Image
-                source={{ uri: user.photoURL }}
+                source={{ uri: user.profile_picture }}
                 style={styles.avatar}
               />
             ) : (
@@ -46,7 +47,7 @@ const AppHeader = () => {
           </View>
           <View style={styles.userTextContainer}>
             <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.userName} numberOfLines={1}>{displayName}</Text>
+            <Text style={styles.userName} numberOfLines={1}>{getUsername()}</Text>
           </View>
         </TouchableOpacity>
       </View>

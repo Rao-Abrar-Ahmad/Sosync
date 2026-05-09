@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Platform, Alert } from 'react-native';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
+import MapView, { Marker } from 'react-native-maps';
+import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getAllDisasterReports, DisasterReportDocument, DisasterType } from '@/config/dbutils';
+import { subscribeToDisasterReports, DisasterReportDocument, DisasterType } from '@/config/dbutils';
 import Theme from '@/config/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
@@ -15,6 +16,7 @@ const DEFAULT_REGION = {
 };
 
 export default function MapScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<DisasterReportDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,24 +24,17 @@ export default function MapScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMapData();
-  }, []);
+    requestUserLocation();
 
-  const loadMapData = async () => {
     setLoading(true);
-    setError(null);
-
-    try {
-      const fetchedReports = await getAllDisasterReports();
-      setReports(fetchedReports);
-      await requestUserLocation();
-    } catch (err) {
-      console.error('Error loading map data:', err);
-      setError('Unable to load map data. Please try again.');
-    } finally {
+    const unsubscribe = subscribeToDisasterReports((newReports) => {
+      setReports(newReports);
       setLoading(false);
-    }
-  };
+      setError(null);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const requestUserLocation = async () => {
     try {
@@ -80,32 +75,23 @@ export default function MapScreen() {
     }
   };
 
-  const handleReload = () => {
-    loadMapData();
-  };
-
-  const MapComponent = Platform.OS === 'ios' ? AppleMaps.View : GoogleMaps.View;
-
-  const cameraPosition = {
-    coordinates: {
-      latitude: location ? location.latitude : DEFAULT_REGION.latitude,
-      longitude: location ? location.longitude : DEFAULT_REGION.longitude,
-    },
-    zoom: location ? 13 : 5,
+  const mapRegion = {
+    latitude: location ? location.latitude : DEFAULT_REGION.latitude,
+    longitude: location ? location.longitude : DEFAULT_REGION.longitude,
+    latitudeDelta: location ? 0.05 : DEFAULT_REGION.latitudeDelta,
+    longitudeDelta: location ? 0.05 : DEFAULT_REGION.longitudeDelta,
   };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}> 
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View>
           <Text style={styles.title}>Disaster Map</Text>
-          <Text style={styles.subtitle}>Tap a marker to review the report location.</Text>
+          <Text style={styles.subtitle}>Tap a marker to review the report details.</Text>
+          {/* <View>
+            Add list of colors with their alert type, so user can easily understand, which color of market means what.
+          </View> */}
         </View>
-
-        <TouchableOpacity style={styles.reloadButton} onPress={handleReload}>
-          <FontAwesome name="refresh" size={18} color="#fff" />
-          <Text style={styles.reloadText}>Reload</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -125,17 +111,23 @@ export default function MapScreen() {
             </TouchableOpacity>
           )}
 
-          <MapComponent
+          <MapView
             style={styles.map}
-            cameraPosition={cameraPosition}
-            markers={reports.map((report) => ({
-              id: report.id,
-              coordinates: { latitude: report.latitude, longitude: report.longitude },
-              title: report.type,
-              snippet: report.address || report.description,
-            }))}
-            uiSettings={{ myLocationButtonEnabled: true, zoomControlsEnabled: true }}
-          />
+            region={mapRegion}
+            showsUserLocation={true}
+            showsMyLocationButton={true}
+          >
+            {reports.map((report) => (
+              <Marker
+                key={report.id}
+                coordinate={{ latitude: report.latitude, longitude: report.longitude }}
+                title={report.type}
+                description={report.address || report.description}
+                pinColor={getDisasterMarkerColor(report.type)}
+                onCalloutPress={() => router.push(`/report/${report.id}` as any)}
+              />
+            ))}
+          </MapView>
         </>
       )}
     </View>
@@ -165,20 +157,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Theme.variants.textMuted,
     marginTop: 4,
-  },
-  reloadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Theme.variants.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  reloadText: {
-    color: '#fff',
-    fontFamily: Theme.typography.inter.semibold,
-    fontSize: 14,
   },
   map: {
     flex: 1,

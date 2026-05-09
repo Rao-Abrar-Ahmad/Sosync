@@ -12,17 +12,21 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
+import MapView, { Marker } from 'react-native-maps';
+import * as ImagePicker from 'expo-image-picker';
 import { createDisasterReport, DisasterType } from '@/config/dbutils';
+import { uploadMedia } from '@/config/storage';
 import { useUser } from '@/context/UserContext';
 import Theme from '@/config/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { DISASTER_TYPES } from '@/constants/utils';
 
-const DISASTER_TYPES: DisasterType[] = ['FLOOD', 'EARTHQUAKE', 'FIRE', 'ACCIDENT', 'LANDSLIDE', 'OTHER'];
+
 const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
 
 // Default location (Pakistan center)
@@ -42,6 +46,9 @@ export default function CreateReportScreen() {
   // Location state (numeric, not strings)
   const [markerCoords, setMarkerCoords] = useState(DEFAULT_COORDS);
   const [gpsCoords, setGpsCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Media state
+  const [mediaItems, setMediaItems] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -107,6 +114,53 @@ export default function CreateReportScreen() {
     }
   };
 
+  // Media handlers
+  const pickMedia = async () => {
+    if (mediaItems.length >= 3) {
+      Alert.alert('Limit Reached', 'You can attach up to 3 items maximum.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission Required', 'Allow photo library access to attach media.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsEditing: false,
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: 3 - mediaItems.length,
+    });
+    if (!result.canceled && result.assets) {
+      setMediaItems(prev => [...prev, ...result.assets].slice(0, 3));
+    }
+  };
+
+  const takeMedia = async () => {
+    if (mediaItems.length >= 3) {
+      Alert.alert('Limit Reached', 'You can attach up to 3 items maximum.');
+      return;
+    }
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission Required', 'Allow camera access to capture media.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsEditing: false,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets) {
+      setMediaItems(prev => [...prev, ...result.assets].slice(0, 3));
+    }
+  };
+
+  const removeMedia = (index: number) => {
+    setMediaItems(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Reverse geocode coordinates to address
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
@@ -139,11 +193,13 @@ export default function CreateReportScreen() {
   }, []);
 
   // Handle map tap — move marker to tapped location
-  const handleMapClick: any = (event: { coordinates: { latitude: number; longitude: number } }) => {
-    setMarkerCoords({
-      latitude: event.coordinates.latitude,
-      longitude: event.coordinates.longitude,
-    });
+  const handleMapClick = (event: any) => {
+    if (event.nativeEvent && event.nativeEvent.coordinate) {
+      setMarkerCoords({
+        latitude: event.nativeEvent.coordinate.latitude,
+        longitude: event.nativeEvent.coordinate.longitude,
+      });
+    }
   };
 
   // Re-center map to GPS location
@@ -187,6 +243,21 @@ export default function CreateReportScreen() {
     try {
       setLoading(true);
 
+      const uploadedMedia: any[] = [];
+      
+      // Upload media if present
+      for (const item of mediaItems) {
+        const fileName = item.uri.substring(item.uri.lastIndexOf('/') + 1);
+        const path = `reports/${user.uid}/${Date.now()}_${fileName}`;
+        const url = await uploadMedia(item.uri, path);
+        uploadedMedia.push({
+          type: item.type === 'video' ? 'video' : 'image',
+          url,
+          file_name: fileName,
+          uploaded_at: new Date(),
+        });
+      }
+
       await createDisasterReport({
         user_id: user.uid,
         type: disasterType,
@@ -196,6 +267,7 @@ export default function CreateReportScreen() {
         longitude: markerCoords.longitude,
         address: address.trim() || '',
         severity_level: severity || '',
+        media: uploadedMedia,
       });
 
       Alert.alert('Success', 'Disaster report created successfully!', [
@@ -212,12 +284,12 @@ export default function CreateReportScreen() {
     }
   };
 
-  // Map component based on platform
-  const MapComponent = Platform.OS === 'ios' ? AppleMaps.View : GoogleMaps.View;
-
-  const cameraPosition = {
-    coordinates: markerCoords,
-    zoom: 15,
+  // Region for MapView
+  const mapRegion = {
+    latitude: markerCoords.latitude,
+    longitude: markerCoords.longitude,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
   };
 
   return (
@@ -282,6 +354,41 @@ export default function CreateReportScreen() {
             />
           </View>
 
+          {/* Media Attachments */}
+          <Text style={styles.sectionTitle}>Attachments (Max 3)</Text>
+          <View style={styles.mediaContainer}>
+            <TouchableOpacity style={styles.mediaButton} onPress={pickMedia} disabled={loading}>
+              <FontAwesome name="image" size={16} color={Theme.variants.primary} />
+              <Text style={styles.mediaButtonText}>Gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mediaButton} onPress={takeMedia} disabled={loading}>
+              <FontAwesome name="camera" size={16} color={Theme.variants.primary} />
+              <Text style={styles.mediaButtonText}>Camera</Text>
+            </TouchableOpacity>
+          </View>
+
+          {mediaItems.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScroll}>
+              {mediaItems.map((item, index) => (
+                <View key={index} style={styles.mediaThumbnailContainer}>
+                  <Image source={{ uri: item.uri }} style={styles.mediaThumbnail} />
+                  {item.type === 'video' && (
+                    <View style={styles.videoIndicator}>
+                      <FontAwesome name="video-camera" size={12} color="#fff" />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.mediaRemoveButton}
+                    onPress={() => removeMedia(index)}
+                    disabled={loading}
+                  >
+                    <FontAwesome name="close" size={12} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
           {/* Location Section */}
           <Text style={styles.sectionTitle}>Location</Text>
           <Text style={styles.locationHint}>
@@ -296,23 +403,19 @@ export default function CreateReportScreen() {
                 <Text style={styles.mapLoadingText}>Detecting your location...</Text>
               </View>
             ) : (
-              <MapComponent
+              <MapView
                 style={styles.map}
-                cameraPosition={cameraPosition}
-                onMapClick={handleMapClick}
-                markers={[
-                  {
-                    id: 'selected-location',
-                    coordinates: markerCoords,
-                    title: 'Report Location',
-                    snippet: address || 'Tap the map to change location',
-                  },
-                ]}
-                uiSettings={{
-                  zoomControlsEnabled: true,
-                  myLocationButtonEnabled: false,
-                }}
-              />
+                region={mapRegion}
+                onPress={handleMapClick}
+                showsUserLocation={false}
+                zoomEnabled={true}
+              >
+                <Marker
+                  coordinate={markerCoords}
+                  title="Report Location"
+                  description={address || 'Tap the map to change location'}
+                />
+              </MapView>
             )}
 
             {/* Re-center GPS button (floating on map) */}
@@ -364,7 +467,10 @@ export default function CreateReportScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <>
+                <ActivityIndicator color="#fff" />
+                <Text style={styles.submitButtonText}>{mediaItems.length > 0 ? 'Uploading...' : 'Submitting...'}</Text>
+              </>
             ) : (
               <>
                 <FontAwesome name="send" size={16} color="#fff" />
@@ -581,6 +687,64 @@ const styles = StyleSheet.create({
     color: Theme.variants.textMuted,
     marginBottom: 10,
     fontStyle: 'italic',
+  },
+
+  // Media styles
+  mediaContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  mediaButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Theme.variants.primary,
+    borderRadius: 10,
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  mediaButtonText: {
+    fontFamily: Theme.typography.inter.medium,
+    fontSize: 13,
+    color: Theme.variants.primary,
+  },
+  mediaScroll: {
+    marginBottom: 16,
+  },
+  mediaThumbnailContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  mediaThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#eee',
+  },
+  mediaRemoveButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  videoIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 4,
+    padding: 2,
   },
 
   // Map styles

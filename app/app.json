@@ -75,7 +75,6 @@
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
-      "expo-maps",
       "expo-web-browser",
       "expo-notifications"
     ],

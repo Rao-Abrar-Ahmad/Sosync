@@ -125,6 +125,7 @@ function AuthHandler() {
       <Stack.Screen name="(auth)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
       <Stack.Screen name="admin" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+      <Stack.Screen name="report/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: '#fff' } }} />
     </Stack>
   );
 }
