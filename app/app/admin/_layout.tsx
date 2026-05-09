@@ -19,7 +19,30 @@ export default function AdminLayout() {
         name="index" 
         options={{ 
           title: 'Admin Dashboard',
-          headerShown: true
+        }} 
+      />
+      <Stack.Screen 
+        name="users" 
+        options={{ 
+          title: 'User Management',
+        }} 
+      />
+      <Stack.Screen 
+        name="reports" 
+        options={{ 
+          title: 'Report Management',
+        }} 
+      />
+      <Stack.Screen 
+        name="sos" 
+        options={{ 
+          title: 'SOS Monitor',
+        }} 
+      />
+      <Stack.Screen 
+        name="report/[id]" 
+        options={{ 
+          title: 'Report Review',
         }} 
       />
     </Stack>

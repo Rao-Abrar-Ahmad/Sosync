@@ -13,7 +13,7 @@ import {
   getActiveSOSAlert, getEmergencyContacts, SOSAlertDocument,
   EmergencyContactDocument,
 } from '@/config/dbutils';
-import { sendSOSPushNotification } from '@/config/notifications';
+import { sendSOSPushNotification } from '@/services/NotificationService';
 
 export default function SOSScreen() {
   const router = useRouter();

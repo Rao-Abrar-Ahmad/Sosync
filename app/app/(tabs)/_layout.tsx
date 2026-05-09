@@ -11,7 +11,7 @@ function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
 }) {
-  return <FontAwesome size={18} style={{ marginBottom: -3 }} {...props} />;
+  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
 }
 
 export default function TabLayout() {
@@ -29,21 +29,24 @@ export default function TabLayout() {
         },
         tabBarStyle: {
           backgroundColor: '#fff',
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom,
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: '#e0e0e0',
-          borderBlockColor: '#e0e0e0',
+          height: 65 + insets.bottom,
+          paddingBottom: insets.bottom + 5,
+          paddingTop: 10,
+          borderTopWidth: 1,
+          borderTopColor: '#f0f0f0',
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 5,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 10,
         },
-        tabBarActiveBackgroundColor: Theme?.colors.alabasterGrey,
-        tabBarActiveTintColor: '#000',
+        tabBarActiveTintColor: Theme.variants.primary,
+        tabBarInactiveTintColor: '#999',
+        tabBarLabelStyle: {
+          fontFamily: Theme.typography.inter.medium,
+          fontSize: 11,
+          marginTop: 2,
+        },
       }}>
       <Tabs.Screen
         name="index"
@@ -78,29 +81,37 @@ export default function TabLayout() {
       <Tabs.Screen
         name="create-report"
         options={{
-          tabBarButton: () => null,
-          title: 'Create Report',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
         name="edit-profile"
         options={{
-          tabBarButton: () => null,
-          title: 'Edit Profile',
+          href: null,
         }}
       />
       <Tabs.Screen
         name="emergency-contacts"
         options={{
-          tabBarButton: () => null,
-          title: 'Emergency Contacts',
+          href: null,
         }}
       />
       <Tabs.Screen
         name="sos"
         options={{
-          tabBarButton: () => null,
-          title: 'SOS Emergency',
+          href: null,
         }}
       />
     </Tabs>

@@ -6,11 +6,106 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@/context/UserContext';
 import Theme from '@/config/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import * as Location from 'expo-location';
+import { subscribeToDisasterReports, subscribeToActiveSOSAlerts, DisasterReportDocument, SOSAlertDocument } from '@/config/dbutils';
+import { calculateDistance, getDisasterIcon } from '@/constants/utils';
+import { useState } from 'react';
+import CriticalAlertOverlay from '@/components/CriticalAlertOverlay';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, loading } = useUser();
+
+  // State for nearby alerts
+  const [nearestAlert, setNearestAlert] = useState<{ type: 'REPORT' | 'SOS', data: any, distance: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
+  const [showCriticalOverlay, setShowCriticalOverlay] = useState(false);
+  const [dismissedAlertId, setDismissedAlertId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (nearestAlert && nearestAlert.distance < 1.0 && dismissedAlertId !== nearestAlert.data.id) {
+      setShowCriticalOverlay(true);
+    } else {
+      setShowCriticalOverlay(false);
+    }
+  }, [nearestAlert, dismissedAlertId]);
+
+  useEffect(() => {
+    let unsubscribeReports: (() => void) | undefined;
+    let unsubscribeSOS: (() => void) | undefined;
+    let locationSubscription: Location.LocationSubscription | undefined;
+
+    const setupAlerts = async () => {
+      // 1. Get initial location
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      let location = await Location.getCurrentPositionAsync({});
+      setUserLocation({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+
+      // 2. Subscribe to location changes
+      locationSubscription = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, distanceInterval: 100 },
+        (loc) => {
+          setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        }
+      );
+
+      let activeReports: DisasterReportDocument[] = [];
+      let activeSOS: SOSAlertDocument[] = [];
+
+      const updateNearest = (reports: DisasterReportDocument[], sos: SOSAlertDocument[], loc: { latitude: number, longitude: number }) => {
+        let closest: any = null;
+        let minDistance = 10; // Only show alerts within 10km
+
+        // Check SOS alerts first (higher priority)
+        sos.forEach(s => {
+          if (s.user_id === user?.id) return; // Skip own SOS
+          const d = calculateDistance(loc.latitude, loc.longitude, s.latitude, s.longitude);
+          if (d < minDistance) {
+            minDistance = d;
+            closest = { type: 'SOS', data: s, distance: d };
+          }
+        });
+
+        // Check disaster reports
+        reports.forEach(r => {
+          if (r.status === 'FALSE_ALARM' || r.status === 'RESOLVED') return;
+          const d = calculateDistance(loc.latitude, loc.longitude, r.latitude, r.longitude);
+          if (d < minDistance) {
+            // If it's a critical report or closer than a previously found SOS
+            if (!closest || d < closest.distance) {
+              minDistance = d;
+              closest = { type: 'REPORT', data: r, distance: d };
+            }
+          }
+        });
+
+        setNearestAlert(closest);
+      };
+
+      // 3. Listen to reports
+      unsubscribeReports = subscribeToDisasterReports((reports) => {
+        activeReports = reports;
+        if (userLocation) updateNearest(activeReports, activeSOS, userLocation);
+      });
+
+      // 4. Listen to SOS
+      unsubscribeSOS = subscribeToActiveSOSAlerts((alerts) => {
+        activeSOS = alerts;
+        if (userLocation) updateNearest(activeReports, activeSOS, userLocation);
+      });
+    };
+
+    if (user) setupAlerts();
+
+    return () => {
+      if (unsubscribeReports) unsubscribeReports();
+      if (unsubscribeSOS) unsubscribeSOS();
+      if (locationSubscription) locationSubscription.remove();
+    };
+  }, [user]);
 
   // SOS button pulse animation
   const sosPulse = useRef(new Animated.Value(1)).current;
@@ -24,6 +119,14 @@ export default function HomeScreen() {
     anim.start();
     return () => anim.stop();
   }, []);
+
+  // Redirect admin to admin panel
+  useEffect(() => {
+    if (user && user.role === 'ADMIN') {
+      router.replace('/admin');
+    }
+  }, [user])
+
 
   return (
     <LinearGradient
@@ -50,6 +153,54 @@ export default function HomeScreen() {
             <Text style={styles.subheading}>Report disasters and save lives</Text>
           </View>
         </View>
+
+        {/* Nearby Alert Section */}
+        {nearestAlert && (
+          <View style={[styles.section, { marginBottom: 0 }]}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={[styles.alertCard, nearestAlert.type === 'SOS' && styles.sosAlertCard]}
+              onPress={() => {
+                if (nearestAlert.type === 'REPORT') {
+                  router.push(`/report/${nearestAlert.data.id}` as any);
+                } else {
+                  router.push('/(tabs)/map'); // Or a specific SOS detail screen
+                }
+              }}
+            >
+              <View style={[styles.alertIconContainer, nearestAlert.type === 'SOS' && styles.sosAlertIcon]}>
+                <FontAwesome
+                  name={nearestAlert.type === 'SOS' ? 'warning' : getDisasterIcon(nearestAlert.data.type)}
+                  size={24}
+                  color="#fff"
+                />
+              </View>
+              <View style={styles.alertContent}>
+                <Text style={[styles.alertTitle, nearestAlert.type === 'SOS' && styles.sosAlertTitle]}>
+                  {nearestAlert.type === 'SOS' ? 'Nearby Emergency SOS' : `Nearby ${nearestAlert.data.type}`}
+                </Text>
+                <Text style={[styles.alertSubtitle, nearestAlert.type === 'SOS' && styles.sosAlertText]} numberOfLines={1}>
+                  {nearestAlert.type === 'SOS' ? 'Someone nearby needs help immediately!' : nearestAlert.data.description}
+                </Text>
+                <Text style={[styles.alertDistance, nearestAlert.type === 'SOS' && styles.sosAlertText]}>
+                  📍 {nearestAlert.distance.toFixed(1)} km away
+                </Text>
+              </View>
+              <FontAwesome name="chevron-right" size={14} color={nearestAlert.type === 'SOS' ? '#B71C1C' : '#E65100'} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <CriticalAlertOverlay
+          visible={showCriticalOverlay}
+          type={nearestAlert?.type || 'REPORT'}
+          data={nearestAlert?.data}
+          distance={nearestAlert?.distance || 0}
+          onDismiss={() => {
+            setShowCriticalOverlay(false);
+            if (nearestAlert) setDismissedAlertId(nearestAlert.data.id);
+          }}
+        />
 
         {/* Quick Actions */}
         <View style={[styles.section, loading && styles.opacityReduced]}>
@@ -336,5 +487,62 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     marginTop: 1,
+  },
+  alertCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    backgroundColor: '#FFF8E1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#FFA000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  alertIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFA000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontFamily: Theme.typography.inter.bold,
+    fontSize: 16,
+    color: '#E65100',
+    marginBottom: 2,
+  },
+  alertSubtitle: {
+    fontFamily: Theme.typography.inter.regular,
+    fontSize: 13,
+    color: '#6D4C41',
+  },
+  alertDistance: {
+    fontFamily: Theme.typography.inter.bold,
+    fontSize: 12,
+    color: '#E65100',
+    marginTop: 4,
+  },
+  sosAlertCard: {
+    borderColor: '#FFCDD2',
+    backgroundColor: '#FFEBEE',
+  },
+  sosAlertIcon: {
+    backgroundColor: '#D32F2F',
+  },
+  sosAlertTitle: {
+    color: '#B71C1C',
+  },
+  sosAlertText: {
+    color: '#C62828',
   },
 });

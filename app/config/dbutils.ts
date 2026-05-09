@@ -303,6 +303,14 @@ export async function createDisasterReport(
       updated_at: serverTimestamp(),
     });
 
+    // Log a notification for the user
+    await createNotification(
+      reportData.user_id,
+      `Your report for ${reportData.type} has been successfully submitted.`,
+      'DISASTER_REPORT',
+      reportId
+    );
+
     return reportId;
   } catch (error) {
     console.error('Error creating disaster report:', error);
@@ -758,12 +766,24 @@ export async function voteOnReport(
         updates.dismiss_count = increment(-1);
         if (currentConfirm + 1 >= 5 && reportData.status === 'PENDING') {
           updates.status = 'VERIFIED';
+          await createNotification(
+            reportData.user_id,
+            `Great news! Your report for ${reportData.type} has been VERIFIED by the community.`,
+            'STATUS_UPDATE',
+            reportId
+          );
         }
       } else {
         updates.dismiss_count = increment(1);
         updates.confirm_count = increment(-1);
         if (currentDismiss + 1 >= 3 && reportData.status !== 'FALSE_ALARM') {
           updates.status = 'FALSE_ALARM';
+          await createNotification(
+            reportData.user_id,
+            `Your report for ${reportData.type} has been marked as a FALSE ALARM by the community.`,
+            'STATUS_UPDATE',
+            reportId
+          );
         }
       }
     } else {
@@ -793,6 +813,298 @@ export async function voteOnReport(
     await updateDoc(reportRef, updates);
   } catch (error) {
     console.error('Error voting on report:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update user push token for notifications
+ */
+export async function updateUserPushToken(userId: string, token: string): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      pushToken: token,
+      updated_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating push token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Subscribe to all active SOS alerts
+ */
+export function subscribeToActiveSOSAlerts(callback: (alerts: SOSAlertDocument[]) => void): () => void {
+  const alertsRef = collection(db, 'sos_alerts');
+  const q = query(alertsRef, where('status', '==', 'ACTIVE'));
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const alerts: SOSAlertDocument[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        alerts.push({
+          ...data,
+          created_at: data.created_at?.toDate?.() || new Date(),
+        } as SOSAlertDocument);
+      });
+      callback(alerts);
+    },
+    (error) => {
+      console.error('Error in SOS alerts listener:', error);
+    }
+  );
+
+  return unsubscribe;
+}
+
+// ============================================================================
+// NOTIFICATIONS MANAGEMENT
+// ============================================================================
+
+export type NotificationType = 'DISASTER_REPORT' | 'SOS_ALERT' | 'STATUS_UPDATE' | 'SYSTEM';
+
+export interface NotificationDocument {
+  id: string;
+  user_id: string;
+  report_id?: string;
+  sos_id?: string;
+  message: string;
+  type: NotificationType;
+  is_read: boolean;
+  created_at: Timestamp | Date;
+}
+
+/**
+ * Get all notifications for a user
+ */
+export async function getNotifications(userId: string): Promise<NotificationDocument[]> {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(
+      notificationsRef,
+      where('user_id', '==', userId)
+    );
+    const querySnapshot = await getDocs(q);
+
+    const notifications: NotificationDocument[] = [];
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      notifications.push({
+        ...data,
+        created_at: data.created_at?.toDate?.() || new Date(),
+      } as NotificationDocument);
+    });
+
+    // Sort client-side (newest first)
+    notifications.sort((a, b) => {
+      const dateA = a.created_at instanceof Date ? a.created_at.getTime() : 0;
+      const dateB = b.created_at instanceof Date ? b.created_at.getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return notifications;
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    throw error;
+  }
+}
+
+/**
+ * Subscribe to notifications for a user
+ */
+export function subscribeToNotifications(userId: string, callback: (notifications: NotificationDocument[]) => void): () => void {
+  const notificationsRef = collection(db, 'notifications');
+  const q = query(notificationsRef, where('user_id', '==', userId));
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const notifications: NotificationDocument[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      notifications.push({
+        ...data,
+        created_at: data.created_at?.toDate?.() || new Date(),
+      } as NotificationDocument);
+    });
+
+    notifications.sort((a, b) => {
+      const dateA = a.created_at instanceof Date ? a.created_at.getTime() : 0;
+      const dateB = b.created_at instanceof Date ? b.created_at.getTime() : 0;
+      return dateB - dateA;
+    });
+
+    callback(notifications);
+  });
+
+  return unsubscribe;
+}
+
+/**
+ * Mark a notification as read
+ */
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  try {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, { is_read: true });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a new notification
+ */
+export async function createNotification(
+  userId: string,
+  message: string,
+  type: NotificationType,
+  reportId?: string,
+  sosId?: string
+): Promise<string> {
+  try {
+    const notificationRef = doc(collection(db, 'notifications'));
+    await setDoc(notificationRef, {
+      id: notificationRef.id,
+      user_id: userId,
+      message,
+      type,
+      report_id: reportId || null,
+      sos_id: sosId || null,
+      is_read: false,
+      created_at: serverTimestamp(),
+    });
+    return notificationRef.id;
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// ADMIN UTILITIES
+// ============================================================================
+
+/**
+ * Get aggregated system statistics for admin dashboard
+ */
+export async function adminGetSystemStats() {
+  try {
+    const usersCount = (await getDocs(collection(db, 'users'))).size;
+    const reportsCount = (await getDocs(collection(db, 'disaster_reports'))).size;
+    
+    const sosQuery = query(collection(db, 'sos_alerts'), where('status', '==', 'ACTIVE'));
+    const activeSosCount = (await getDocs(sosQuery)).size;
+
+    return {
+      totalUsers: usersCount,
+      totalReports: reportsCount,
+      activeSOS: activeSosCount,
+    };
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all users for admin management
+ */
+export async function adminGetAllUsers(): Promise<UserDocument[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, orderBy('created_at', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => ({
+      ...doc.data(),
+      created_at: doc.data().created_at?.toDate?.() || new Date(),
+    })) as UserDocument[];
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a user's role
+ */
+export async function adminUpdateUserRole(userId: string, role: 'USER' | 'ADMIN'): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { role, updated_at: serverTimestamp() });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a report's status (Admin override)
+ */
+export async function adminUpdateReportStatus(reportId: string, status: ReportStatus): Promise<void> {
+  try {
+    const reportRef = doc(db, 'disaster_reports', reportId);
+    await updateDoc(reportRef, { status, updated_at: serverTimestamp() });
+  } catch (error) {
+    console.error('Error overriding report status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all votes for a report including user names
+ */
+export async function adminGetReportVotes(reportId: string) {
+  try {
+    const votesRef = collection(db, 'votes');
+    const q = query(votesRef, where('report_id', '==', reportId));
+    const snapshot = await getDocs(q);
+
+    const votes = [];
+    for (const voteDoc of snapshot.docs) {
+      const data = voteDoc.data();
+      // Fetch user info for each vote
+      const userDoc = await getDoc(doc(db, 'users', data.user_id));
+      const userData = userDoc.exists() ? userDoc.data() : null;
+      
+      votes.push({
+        ...data,
+        user_name: userData ? `${userData.first_name} ${userData.last_name}` : 'Unknown User',
+        created_at: data.created_at?.toDate?.() || new Date(),
+      });
+    }
+    
+    // Sort by date (descending)
+    votes.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+    
+    return votes;
+  } catch (error) {
+    console.error('Error fetching report votes:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove a media item from a report
+ */
+export async function adminRemoveReportMedia(reportId: string, fileName: string): Promise<void> {
+  try {
+    const reportRef = doc(db, 'disaster_reports', reportId);
+    const reportSnap = await getDoc(reportRef);
+    if (reportSnap.exists()) {
+      const data = reportSnap.data() as DisasterReportDocument;
+      const updatedMedia = (data.media || []).filter(m => m.file_name !== fileName);
+      await updateDoc(reportRef, { 
+        media: updatedMedia,
+        updated_at: serverTimestamp()
+      });
+    }
+  } catch (error) {
+    console.error('Error removing report media:', error);
     throw error;
   }
 }

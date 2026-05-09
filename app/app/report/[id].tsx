@@ -29,7 +29,7 @@ export default function ReportDetailsScreen() {
       setLoading(true);
       const data = await getDisasterReport(reportId);
       setReport(data);
-      
+
       if (user) {
         const vote = await getUserVoteOnReport(reportId, user.id as any);
         setUserVote(vote);
@@ -70,10 +70,10 @@ export default function ReportDetailsScreen() {
     try {
       setVoting(true);
       await voteOnReport(report.id, user.id as any, voteType);
-      const successMsg = userVote 
+      const successMsg = userVote
         ? `You have changed your vote to ${voteType.toLowerCase()}.`
         : `You have voted to ${voteType.toLowerCase()} this report.`;
-      
+
       Alert.alert('Success', successMsg);
       setUserVote(voteType);
       fetchReportDetails(report.id);
@@ -83,7 +83,7 @@ export default function ReportDetailsScreen() {
       setVoting(false);
     }
   };
-  console.log(report)
+  //console.log(report)
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -184,8 +184,8 @@ export default function ReportDetailsScreen() {
         <View style={styles.votingContainer}>
           <TouchableOpacity
             style={[
-              styles.voteButton, 
-              styles.voteConfirm, 
+              styles.voteButton,
+              styles.voteConfirm,
               voting && { opacity: 0.5 },
               userVote === 'CONFIRM' && styles.activeVoteConfirm
             ]}
@@ -198,8 +198,8 @@ export default function ReportDetailsScreen() {
 
           <TouchableOpacity
             style={[
-              styles.voteButton, 
-              styles.voteDismiss, 
+              styles.voteButton,
+              styles.voteDismiss,
               voting && { opacity: 0.5 },
               userVote === 'DISMISS' && styles.activeVoteDismiss
             ]}

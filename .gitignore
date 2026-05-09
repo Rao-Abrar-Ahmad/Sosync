@@ -66,3 +66,4 @@ lerna-debug.log*
 
 
 app/config/firebaseConfig.ts
+scripts

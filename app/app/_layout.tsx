@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { UserProvider } from '@/context/UserContext';
+import { registerForPushNotificationsAsync, setupNotificationListeners } from '@/services/NotificationService';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -109,6 +110,23 @@ function AuthHandler() {
     }
   }, [user, loading, segments]);
 
+  // Push Notifications Setup
+  useEffect(() => {
+    let unsubscribeListeners: (() => void) | undefined;
+
+    if (user && user.onboarding_completed) {
+      // Register for push notifications
+      registerForPushNotificationsAsync(user.id as any);
+
+      // Setup foreground/response listeners
+      unsubscribeListeners = setupNotificationListeners();
+    }
+
+    return () => {
+      if (unsubscribeListeners) unsubscribeListeners();
+    };
+  }, [user]);
+
   // Hide splash screen once Firebase is done initializing
   useEffect(() => {
     if (!loading) {
@@ -118,6 +136,9 @@ function AuthHandler() {
 
   // Prevent UI flash by keeping returning null while loading
   if (loading) return null;
+
+  //console.log(user);
+  //console.log('USER ROLE: >>>>', user?.role)
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }}>
