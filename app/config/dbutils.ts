@@ -29,6 +29,8 @@ export interface UserDocument {
     accuracy: number;
   };
   location_permission_granted_at?: Timestamp | Date;
+  pushToken?: string;
+  last_active?: Timestamp | Date;
   created_at: Timestamp | Date;
   updated_at: Timestamp | Date;
 }
@@ -350,6 +352,37 @@ export async function updateDisasterReport(
 ): Promise<void> {
   try {
     const reportDocRef = doc(db, 'disaster_reports', reportId);
+    
+    // Check for changes that trigger notifications
+    if (updates.severity_level || updates.status) {
+      const currentReport = await getDisasterReport(reportId);
+      if (currentReport) {
+        // Severity Escalation Check
+        if (updates.severity_level && currentReport.severity_level !== updates.severity_level) {
+          const isEscalation = ['High', 'Critical'].includes(updates.severity_level) && 
+                              !['High', 'Critical'].includes(currentReport.severity_level || '');
+          
+          if (isEscalation) {
+            await createNotification(
+              currentReport.user_id,
+              `The severity of your report for ${currentReport.type} has been ESCALATED to ${updates.severity_level} by an administrator.`,
+              'STATUS_UPDATE',
+              reportId
+            );
+          }
+        }
+
+        // Status Change Check
+        if (updates.status && currentReport.status !== updates.status) {
+          await createNotification(
+            currentReport.user_id,
+            `The status of your report for ${currentReport.type} has been updated to ${updates.status}.`,
+            'STATUS_UPDATE',
+            reportId
+          );
+        }
+      }
+    }
 
     await updateDoc(reportDocRef, {
       ...updates,
@@ -407,29 +440,37 @@ export async function getAllDisasterReports(): Promise<DisasterReportDocument[]>
  * @returns Unsubscribe function to detach the listener
  */
 export function subscribeToDisasterReports(callback: (reports: DisasterReportDocument[]) => void): () => void {
-  const reportsCollectionRef = collection(db, 'disaster_reports');
-  const q = query(reportsCollectionRef, orderBy('created_at', 'desc'));
+  try {
+    const reportsCollectionRef = collection(db, 'disaster_reports');
+    const q = query(reportsCollectionRef, orderBy('created_at', 'desc'));
 
-  const unsubscribe = onSnapshot(
-    q,
-    (querySnapshot) => {
-      const reports: DisasterReportDocument[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        reports.push({
-          ...data,
-          created_at: data.created_at?.toDate?.() || new Date(),
-          updated_at: data.updated_at?.toDate?.() || undefined,
-        } as DisasterReportDocument);
-      });
-      callback(reports);
-    },
-    (error) => {
-      console.error('Error in real-time disaster reports listener:', error);
-    }
-  );
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const reports: DisasterReportDocument[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          reports.push({
+            ...data,
+            created_at: data.created_at?.toDate?.() || new Date(),
+            updated_at: data.updated_at?.toDate?.() || undefined,
+          } as DisasterReportDocument);
+        });
+        callback(reports);
+      },
+      (error) => {
+        console.log('[ERROR] in real-time disaster reports listener:', error.message);
+        // Return empty array to stop loading states in UI
+        callback([]);
+      }
+    );
 
-  return unsubscribe;
+    return unsubscribe;
+  } catch (error: any) {
+    console.log('[ERROR] setting up disaster reports listener:', error.message);
+    callback([]);
+    return () => {};
+  }
 }
 
 // ============================================================================
@@ -818,11 +859,82 @@ export async function voteOnReport(
 }
 
 /**
+ * Undo a previously cast vote on a report
+ */
+export async function undoVoteOnReport(
+  reportId: string,
+  userId: string
+): Promise<void> {
+  try {
+    const votesRef = collection(db, 'votes');
+    const q = query(
+      votesRef,
+      where('report_id', '==', reportId),
+      where('user_id', '==', userId)
+    );
+    const voteSnap = await getDocs(q);
+
+    if (voteSnap.empty) return; // Nothing to undo
+
+    const voteDoc = voteSnap.docs[0];
+    const voteType = voteDoc.data().vote as VoteType;
+
+    // Delete the vote record
+    await deleteDoc(doc(db, 'votes', voteDoc.id));
+
+    // Update the report counts
+    const reportRef = doc(db, 'disaster_reports', reportId);
+    await updateDoc(reportRef, {
+      confirm_count: voteType === 'CONFIRM' ? increment(-1) : increment(0),
+      dismiss_count: voteType === 'DISMISS' ? increment(-1) : increment(0),
+      updated_at: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error undoing vote:', error);
+    throw error;
+  }
+}
+
+/**
+ * Flag a report for administrative review
+ */
+export async function flagReport(
+  reportId: string,
+  userId: string,
+  reason: string,
+  description?: string
+): Promise<void> {
+  try {
+    const flagRef = doc(collection(db, 'flags'));
+    await setDoc(flagRef, {
+      id: flagRef.id,
+      report_id: reportId,
+      user_id: userId,
+      reason,
+      description: description || '',
+      status: 'PENDING',
+      created_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error flagging report:', error);
+    throw error;
+  }
+}
+
+/**
  * Update user push token for notifications
  */
 export async function updateUserPushToken(userId: string, token: string): Promise<void> {
   try {
     const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      // Only update if token is different to avoid infinite loops with UserContext
+      if (data.pushToken === token) return;
+    }
+
     await updateDoc(userRef, {
       pushToken: token,
       updated_at: serverTimestamp(),
@@ -837,28 +949,36 @@ export async function updateUserPushToken(userId: string, token: string): Promis
  * Subscribe to all active SOS alerts
  */
 export function subscribeToActiveSOSAlerts(callback: (alerts: SOSAlertDocument[]) => void): () => void {
-  const alertsRef = collection(db, 'sos_alerts');
-  const q = query(alertsRef, where('status', '==', 'ACTIVE'));
+  try {
+    const alertsRef = collection(db, 'sos_alerts');
+    const q = query(alertsRef, where('status', '==', 'ACTIVE'));
 
-  const unsubscribe = onSnapshot(
-    q,
-    (snapshot) => {
-      const alerts: SOSAlertDocument[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        alerts.push({
-          ...data,
-          created_at: data.created_at?.toDate?.() || new Date(),
-        } as SOSAlertDocument);
-      });
-      callback(alerts);
-    },
-    (error) => {
-      console.error('Error in SOS alerts listener:', error);
-    }
-  );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const alerts: SOSAlertDocument[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          alerts.push({
+            ...data,
+            created_at: data.created_at?.toDate?.() || new Date(),
+          } as SOSAlertDocument);
+        });
+        callback(alerts);
+      },
+      (error) => {
+        console.log('[ERROR] in SOS alerts listener:', error.message);
+        // Return empty array to stop loading states in UI
+        callback([]);
+      }
+    );
 
-  return unsubscribe;
+    return unsubscribe;
+  } catch (error: any) {
+    console.log('[ERROR] setting up SOS alerts listener:', error.message);
+    callback([]);
+    return () => {};
+  }
 }
 
 // ============================================================================
@@ -917,29 +1037,42 @@ export async function getNotifications(userId: string): Promise<NotificationDocu
  * Subscribe to notifications for a user
  */
 export function subscribeToNotifications(userId: string, callback: (notifications: NotificationDocument[]) => void): () => void {
-  const notificationsRef = collection(db, 'notifications');
-  const q = query(notificationsRef, where('user_id', '==', userId));
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(notificationsRef, where('user_id', '==', userId));
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const notifications: NotificationDocument[] = [];
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      notifications.push({
-        ...data,
-        created_at: data.created_at?.toDate?.() || new Date(),
-      } as NotificationDocument);
-    });
+    const unsubscribe = onSnapshot(
+      q, 
+      (snapshot) => {
+        const notifications: NotificationDocument[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          notifications.push({
+            ...data,
+            created_at: data.created_at?.toDate?.() || new Date(),
+          } as NotificationDocument);
+        });
 
-    notifications.sort((a, b) => {
-      const dateA = a.created_at instanceof Date ? a.created_at.getTime() : 0;
-      const dateB = b.created_at instanceof Date ? b.created_at.getTime() : 0;
-      return dateB - dateA;
-    });
+        notifications.sort((a, b) => {
+          const dateA = a.created_at instanceof Date ? a.created_at.getTime() : 0;
+          const dateB = b.created_at instanceof Date ? b.created_at.getTime() : 0;
+          return dateB - dateA;
+        });
 
-    callback(notifications);
-  });
+        callback(notifications);
+      },
+      (error) => {
+        console.log('[ERROR] in notifications listener:', error.message);
+        callback([]);
+      }
+    );
 
-  return unsubscribe;
+    return unsubscribe;
+  } catch (error: any) {
+    console.log('[ERROR] setting up notifications listener:', error.message);
+    callback([]);
+    return () => {};
+  }
 }
 
 /**
@@ -1032,12 +1165,31 @@ export async function adminGetAllUsers(): Promise<UserDocument[]> {
 /**
  * Update a user's role
  */
-export async function adminUpdateUserRole(userId: string, role: 'USER' | 'ADMIN'): Promise<void> {
+export async function adminUpdateUserRole(userId: string, role: 'USER' | 'ADMIN' | 'RESPONDER'): Promise<void> {
   try {
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, { role, updated_at: serverTimestamp() });
   } catch (error) {
     console.error('Error updating user role:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update user details (Admin action)
+ */
+export async function adminUpdateUserDetails(
+  userId: string,
+  updates: { first_name?: string; last_name?: string; phone_number?: string }
+): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      ...updates,
+      updated_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating user details:', error);
     throw error;
   }
 }
@@ -1051,6 +1203,44 @@ export async function adminUpdateReportStatus(reportId: string, status: ReportSt
     await updateDoc(reportRef, { status, updated_at: serverTimestamp() });
   } catch (error) {
     console.error('Error overriding report status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Subscribe to pending flags for admin review
+ */
+export function adminSubscribeToFlags(callback: (flags: any[]) => void): () => void {
+  try {
+    const flagsRef = collection(db, 'flags');
+    const q = query(flagsRef, where('status', '==', 'PENDING'), orderBy('created_at', 'desc'));
+
+    return onSnapshot(q, (snapshot) => {
+      const flags = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.() || new Date(),
+      }));
+      callback(flags);
+    }, (error) => {
+      console.error('Error in flags listener:', error);
+      callback([]);
+    });
+  } catch (error) {
+    console.error('Error setting up flags listener:', error);
+    callback([]);
+    return () => {};
+  }
+}
+
+/**
+ * Update the status of a flag (e.g., RESOLVED, DISMISSED)
+ */
+export async function adminResolveFlag(flagId: string, status: 'RESOLVED' | 'DISMISSED'): Promise<void> {
+  try {
+    const flagRef = doc(db, 'flags', flagId);
+    await updateDoc(flagRef, { status, updated_at: serverTimestamp() });
+  } catch (error) {
+    console.error('Error resolving flag:', error);
     throw error;
   }
 }
@@ -1105,6 +1295,44 @@ export async function adminRemoveReportMedia(reportId: string, fileName: string)
     }
   } catch (error) {
     console.error('Error removing report media:', error);
+    throw error;
+  }
+}
+
+/**
+ * Admin: Update the status of an SOS alert
+ */
+export async function adminUpdateSOSStatus(
+  sosId: string, 
+  status: 'ACTIVE' | 'RESPONDED' | 'RESOLVED'
+): Promise<void> {
+  try {
+    const sosRef = doc(db, 'sos_alerts', sosId);
+    await updateDoc(sosRef, {
+      status,
+      updated_at: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating SOS status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Admin: Update user active status (Suspend/Activate)
+ */
+export async function adminUpdateUserStatus(
+  userId: string,
+  isActive: boolean
+): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      is_active: isActive,
+      updated_at: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating user status:', error);
     throw error;
   }
 }

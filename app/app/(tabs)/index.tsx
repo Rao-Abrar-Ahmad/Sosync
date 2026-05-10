@@ -37,65 +37,72 @@ export default function HomeScreen() {
     let locationSubscription: Location.LocationSubscription | undefined;
 
     const setupAlerts = async () => {
-      // 1. Get initial location
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
+      try {
+        // 1. Get initial location
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
 
-      let location = await Location.getCurrentPositionAsync({});
-      setUserLocation({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+        let location = await Location.getCurrentPositionAsync({});
+        setUserLocation({ latitude: location.coords.latitude, longitude: location.coords.longitude });
 
-      // 2. Subscribe to location changes
-      locationSubscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Balanced, distanceInterval: 100 },
-        (loc) => {
-          setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-        }
-      );
-
-      let activeReports: DisasterReportDocument[] = [];
-      let activeSOS: SOSAlertDocument[] = [];
-
-      const updateNearest = (reports: DisasterReportDocument[], sos: SOSAlertDocument[], loc: { latitude: number, longitude: number }) => {
-        let closest: any = null;
-        let minDistance = 10; // Only show alerts within 10km
-
-        // Check SOS alerts first (higher priority)
-        sos.forEach(s => {
-          if (s.user_id === user?.id) return; // Skip own SOS
-          const d = calculateDistance(loc.latitude, loc.longitude, s.latitude, s.longitude);
-          if (d < minDistance) {
-            minDistance = d;
-            closest = { type: 'SOS', data: s, distance: d };
+        // 2. Subscribe to location changes
+        locationSubscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, distanceInterval: 100 },
+          (loc) => {
+            setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
           }
-        });
+        );
 
-        // Check disaster reports
-        reports.forEach(r => {
-          if (r.status === 'FALSE_ALARM' || r.status === 'RESOLVED') return;
-          const d = calculateDistance(loc.latitude, loc.longitude, r.latitude, r.longitude);
-          if (d < minDistance) {
-            // If it's a critical report or closer than a previously found SOS
-            if (!closest || d < closest.distance) {
+        let activeReports: DisasterReportDocument[] = [];
+        let activeSOS: SOSAlertDocument[] = [];
+
+        const updateNearest = (reports: DisasterReportDocument[], sos: SOSAlertDocument[], loc: { latitude: number, longitude: number }) => {
+          let closest: any = null;
+          let minDistance = 10; // Only show alerts within 10km
+
+          // Check SOS alerts first (higher priority)
+          sos.forEach(s => {
+            if (s.user_id === user?.id) return; // Skip own SOS
+            const d = calculateDistance(loc.latitude, loc.longitude, s.latitude, s.longitude);
+            if (d < minDistance) {
               minDistance = d;
-              closest = { type: 'REPORT', data: r, distance: d };
+              closest = { type: 'SOS', data: s, distance: d };
             }
-          }
+          });
+
+          // Check disaster reports
+          reports.forEach(r => {
+            if (r.status === 'FALSE_ALARM' || r.status === 'RESOLVED') return;
+            const d = calculateDistance(loc.latitude, loc.longitude, r.latitude, r.longitude);
+            if (d < minDistance) {
+              // If it's a critical report or closer than a previously found SOS
+              if (!closest || d < closest.distance) {
+                minDistance = d;
+                closest = { type: 'REPORT', data: r, distance: d };
+              }
+            }
+          });
+
+          setNearestAlert(closest);
+        };
+
+        // 3. Listen to reports
+        unsubscribeReports = subscribeToDisasterReports((reports) => {
+          activeReports = reports;
+          if (userLocation) updateNearest(activeReports, activeSOS, userLocation);
         });
 
-        setNearestAlert(closest);
-      };
-
-      // 3. Listen to reports
-      unsubscribeReports = subscribeToDisasterReports((reports) => {
-        activeReports = reports;
-        if (userLocation) updateNearest(activeReports, activeSOS, userLocation);
-      });
-
-      // 4. Listen to SOS
-      unsubscribeSOS = subscribeToActiveSOSAlerts((alerts) => {
-        activeSOS = alerts;
-        if (userLocation) updateNearest(activeReports, activeSOS, userLocation);
-      });
+        // 4. Listen to SOS (Only for Admin/Responder as per common permission rules)
+        // If standard users are also allowed to see nearby SOS, remove this check
+        if (user?.role === 'ADMIN' || user?.role === 'RESPONDER') {
+          unsubscribeSOS = subscribeToActiveSOSAlerts((alerts) => {
+            activeSOS = alerts;
+            if (userLocation) updateNearest(activeReports, activeSOS, userLocation);
+          });
+        }
+      } catch (error) {
+        console.log('[ERROR] setupAlerts failed:', error);
+      }
     };
 
     if (user) setupAlerts();
@@ -120,12 +127,8 @@ export default function HomeScreen() {
     return () => anim.stop();
   }, []);
 
-  // Redirect admin to admin panel
-  useEffect(() => {
-    if (user && user.role === 'ADMIN') {
-      router.replace('/admin');
-    }
-  }, [user])
+  // Redirect admin to admin panel - Handled by root _layout AuthHandler
+  // Removed local useEffect redirect to prevent navigation conflicts
 
 
   return (

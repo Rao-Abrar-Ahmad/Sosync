@@ -1,13 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MapView, { Marker } from 'react-native-maps';
-import { getDisasterReport, DisasterReportDocument, voteOnReport, getUserVoteOnReport, VoteType } from '@/config/dbutils';
+import { getDisasterReport, DisasterReportDocument, voteOnReport, getUserVoteOnReport, VoteType, undoVoteOnReport, flagReport } from '@/config/dbutils';
 import Theme from '@/config/theme';
 import { useUser } from '@/context/UserContext';
 import { formatDate, formatFirebaseTimestamp, getSeverityColor } from '@/constants/utils';
+
+const FLAG_REASONS = [
+  'Inaccurate Information',
+  'Offensive Content',
+  'Spam',
+  'Duplicate Report',
+  'Other'
+];
 
 export default function ReportDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -17,6 +25,12 @@ export default function ReportDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
   const [userVote, setUserVote] = useState<VoteType | null>(null);
+
+  // Flag Modal State
+  const [flagModalVisible, setFlagModalVisible] = useState(false);
+  const [flagReason, setFlagReason] = useState('');
+  const [flagDescription, setFlagDescription] = useState('');
+  const [flagging, setFlagging] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -41,6 +55,59 @@ export default function ReportDetailsScreen() {
     }
   };
 
+  const handleVote = async (voteType: VoteType) => {
+    if (!user || !report) return;
+    if (userVote === voteType) return;
+
+    try {
+      setVoting(true);
+      await voteOnReport(report.id, user.id as any, voteType);
+      const successMsg = userVote
+        ? `You have changed your vote to ${voteType.toLowerCase()}.`
+        : `You have voted to ${voteType.toLowerCase()} this report.`;
+
+      Alert.alert('Success', successMsg);
+      setUserVote(voteType);
+      fetchReportDetails(report.id);
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to submit vote. Please try again.');
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const handleUndoVote = async () => {
+    if (!user || !report || !userVote) return;
+
+    try {
+      setVoting(true);
+      await undoVoteOnReport(report.id, user.id as any);
+      Alert.alert('Success', 'Your vote has been removed.');
+      setUserVote(null);
+      fetchReportDetails(report.id);
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to remove vote.');
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const handleFlagReport = async () => {
+    if (!user || !report || !flagReason) return;
+
+    try {
+      setFlagging(true);
+      await flagReport(report.id, user.id as any, flagReason, flagDescription);
+      Alert.alert('Reported', 'Thank you. This report has been flagged for administrative review.');
+      setFlagModalVisible(false);
+      setFlagReason('');
+      setFlagDescription('');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to flag report.');
+    } finally {
+      setFlagging(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -63,27 +130,6 @@ export default function ReportDetailsScreen() {
     );
   }
 
-  const handleVote = async (voteType: VoteType) => {
-    if (!user || !report) return;
-    if (userVote === voteType) return;
-
-    try {
-      setVoting(true);
-      await voteOnReport(report.id, user.id as any, voteType);
-      const successMsg = userVote
-        ? `You have changed your vote to ${voteType.toLowerCase()}.`
-        : `You have voted to ${voteType.toLowerCase()} this report.`;
-
-      Alert.alert('Success', successMsg);
-      setUserVote(voteType);
-      fetchReportDetails(report.id);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to submit vote. Please try again.');
-    } finally {
-      setVoting(false);
-    }
-  };
-  //console.log(report)
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -92,7 +138,9 @@ export default function ReportDetailsScreen() {
           <FontAwesome name="chevron-down" size={20} color={Theme.variants.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Report Details</Text>
-        <View style={styles.headerIcon} />
+        <TouchableOpacity onPress={() => setFlagModalVisible(true)} style={styles.headerIconRight}>
+          <FontAwesome name="flag-o" size={18} color="#F44336" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -100,9 +148,6 @@ export default function ReportDetailsScreen() {
         {/* Title & Status Row */}
         <View style={styles.titleRow}>
           <Text style={styles.typeText}>{report.type}</Text>
-          {/* <View style={[styles.statusBadge, { backgroundColor: getStatusColor(report.status) }]}>
-            <Text style={styles.statusText}>{report.status}</Text>
-          </View> */}
         </View>
 
         {/* Date & ID */}
@@ -177,10 +222,19 @@ export default function ReportDetailsScreen() {
         <View style={styles.divider} />
 
         {/* Validation / Voting */}
-        <Text style={styles.sectionTitle}>Community Validation</Text>
+        <View style={styles.validationHeader}>
+          <Text style={styles.sectionTitle}>Community Validation</Text>
+          {userVote && (
+            <TouchableOpacity onPress={handleUndoVote} disabled={voting}>
+              <Text style={styles.undoText}>Undo Vote</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
         <Text style={styles.validationHelpText}>
           Help the community by validating this report. Is this information accurate?
         </Text>
+        
         <View style={styles.votingContainer}>
           <TouchableOpacity
             style={[
@@ -212,6 +266,57 @@ export default function ReportDetailsScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Flag Modal */}
+      <Modal
+        visible={flagModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setFlagModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Flag Report</Text>
+              <TouchableOpacity onPress={() => setFlagModalVisible(false)}>
+                <FontAwesome name="times" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.modalLabel}>Why are you flagging this report?</Text>
+              {FLAG_REASONS.map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.reasonOption, flagReason === r && styles.reasonSelected]}
+                  onPress={() => setFlagReason(r)}
+                >
+                  <Text style={[styles.reasonText, flagReason === r && styles.reasonTextSelected]}>{r}</Text>
+                  {flagReason === r && <FontAwesome name="check-circle" size={18} color={Theme.variants.primary} />}
+                </TouchableOpacity>
+              ))}
+
+              <Text style={[styles.modalLabel, { marginTop: 20 }]}>Additional Details (Optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Provide more context..."
+                value={flagDescription}
+                onChangeText={setFlagDescription}
+                multiline
+                numberOfLines={3}
+              />
+
+              <TouchableOpacity
+                style={[styles.submitFlagBtn, (!flagReason || flagging) && { opacity: 0.5 }]}
+                onPress={handleFlagReport}
+                disabled={!flagReason || flagging}
+              >
+                {flagging ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitFlagText}>Submit Flag</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -225,6 +330,7 @@ const styles = StyleSheet.create({
   backButtonText: { color: '#fff', fontFamily: Theme.typography.inter.bold },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Theme.variants.border },
   headerIcon: { width: 40, alignItems: 'flex-start' },
+  headerIconRight: { width: 40, alignItems: 'flex-end' },
   headerTitle: { fontFamily: Theme.typography.geom, fontSize: 20, color: Theme.variants.text, fontWeight: 'bold' },
   content: { padding: 16, paddingBottom: 40 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -247,6 +353,8 @@ const styles = StyleSheet.create({
   addressText: { fontFamily: Theme.typography.inter.regular, fontSize: 14, color: Theme.variants.text, marginBottom: 12 },
   mapContainer: { height: 200, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: Theme.variants.border },
   map: { flex: 1 },
+  validationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  undoText: { fontFamily: Theme.typography.inter.semibold, fontSize: 12, color: Theme.variants.primary },
   validationHelpText: { fontFamily: Theme.typography.inter.regular, fontSize: 13, color: Theme.variants.textMuted, marginBottom: 16 },
   votingContainer: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   voteButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8, gap: 8 },
@@ -255,4 +363,19 @@ const styles = StyleSheet.create({
   voteButtonText: { color: '#fff', fontFamily: Theme.typography.inter.bold, fontSize: 16 },
   activeVoteConfirm: { borderWidth: 3, borderColor: '#1B5E20', backgroundColor: '#43A047' },
   activeVoteDismiss: { borderWidth: 3, borderColor: '#B71C1C', backgroundColor: '#E53935' },
+  
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontFamily: Theme.typography.inter.bold, color: Theme.variants.text },
+  modalBody: { marginBottom: 20 },
+  modalLabel: { fontSize: 14, fontFamily: Theme.typography.inter.semibold, color: Theme.variants.text, marginBottom: 12 },
+  reasonOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  reasonSelected: { borderBottomColor: Theme.variants.primary },
+  reasonText: { fontSize: 15, fontFamily: Theme.typography.inter.regular, color: '#444' },
+  reasonTextSelected: { fontFamily: Theme.typography.inter.semibold, color: Theme.variants.primary },
+  modalInput: { backgroundColor: '#f5f5f5', borderRadius: 12, padding: 12, height: 100, textAlignVertical: 'top', marginTop: 8, fontSize: 15, fontFamily: Theme.typography.inter.regular },
+  submitFlagBtn: { backgroundColor: Theme.variants.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
+  submitFlagText: { color: '#fff', fontSize: 16, fontFamily: Theme.typography.inter.bold },
 });

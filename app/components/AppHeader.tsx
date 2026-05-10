@@ -13,7 +13,8 @@ const AppHeader = () => {
 
   // Get user's first name or email
   const getUsername = () => {
-    return user?.first_name + " " + user?.last_name;
+    if (!user?.first_name && !user?.last_name) return user?.email?.split('@')[0] || "User";
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim();
   }
 
   // Format greeting based on time of day

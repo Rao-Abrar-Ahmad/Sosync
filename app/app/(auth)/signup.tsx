@@ -30,6 +30,8 @@ export default function SignupScreen() {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const router = useRouter();
@@ -193,8 +195,8 @@ export default function SignupScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
-                <ScrollView 
-                    contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 40) + 20, paddingTop: Math.max(insets.top, 20) + 20 }]} 
+                <ScrollView
+                    contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 40) + 20, paddingTop: Math.max(insets.top, 20) + 20 }]}
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.header}>
@@ -250,29 +252,56 @@ export default function SignupScreen() {
                             />
                         </View>
 
-                        {/* Password */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
-                            <Input
-                                placeholder="Min. 6 characters"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                editable={!loading && !googleLoading}
-                            />
+                        {/* Password and Confirm Password */}
+                        <View style={styles.row}>
+                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                <Text style={styles.label}>Password</Text>
+                                <View style={styles.passwordWrapper}>
+                                    <Input
+                                        placeholder=""
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={!showPassword}
+                                        editable={!loading && !googleLoading}
+                                        style={styles.passwordInput}
+                                    />
+                                    <TouchableOpacity
+                                        style={styles.eyeIcon}
+                                        onPress={() => setShowPassword(!showPassword)}
+                                    >
+                                        <FontAwesome
+                                            name={showPassword ? "eye" : "eye-slash"}
+                                            size={18}
+                                            color={Theme.variants.textMuted}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <View style={[styles.inputContainer, { flex: 1 }]}>
+                                <Text style={styles.label}>Confirm</Text>
+                                <View style={styles.passwordWrapper}>
+                                    <Input
+                                        placeholder=""
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        secureTextEntry={!showConfirmPassword}
+                                        editable={!loading && !googleLoading}
+                                        style={styles.passwordInput}
+                                    />
+                                    <TouchableOpacity
+                                        style={styles.eyeIcon}
+                                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    >
+                                        <FontAwesome
+                                            name={showConfirmPassword ? "eye" : "eye-slash"}
+                                            size={18}
+                                            color={Theme.variants.textMuted}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         </View>
-
-                        {/* Confirm Password */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Confirm Password</Text>
-                            <Input
-                                placeholder="Re-enter password"
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                secureTextEntry
-                                editable={!loading && !googleLoading}
-                            />
-                        </View>
+                        
 
                         {/* Sign Up Button */}
                         <TouchableOpacity
@@ -371,7 +400,7 @@ const styles = StyleSheet.create({
     },
     button: {
         backgroundColor: Theme.variants.primary,
-        padding: 15,
+        padding: 12,
         borderRadius: 10,
         alignItems: 'center',
         marginTop: 10,
@@ -387,7 +416,7 @@ const styles = StyleSheet.create({
     buttonText: {
         fontFamily: Theme.typography.inter.bold,
         color: '#fff',
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '600',
     },
     dividerContainer: {
@@ -411,12 +440,13 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: Theme.variants.border,
-        padding: 15,
+        padding: 12,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
         marginBottom: 10,
+
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -426,7 +456,7 @@ const styles = StyleSheet.create({
     googleButtonText: {
         fontFamily: Theme.typography.inter.semibold,
         color: '#000',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
     },
     footer: {
@@ -444,5 +474,19 @@ const styles = StyleSheet.create({
         color: Theme.variants.primary,
         fontSize: 14,
         fontWeight: '600',
+    },
+    passwordWrapper: {
+        position: 'relative',
+        justifyContent: 'center',
+    },
+    passwordInput: {
+        paddingRight: 45, // Make room for the eye icon
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: 12,
+        height: '100%',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
     },
 });

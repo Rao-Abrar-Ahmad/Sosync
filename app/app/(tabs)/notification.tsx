@@ -158,7 +158,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   unreadCard: {
-    backgroundColor: '#f0f7ff',
+    backgroundColor: '#ffffff',
+    borderColor: '#f0f0f0',
+    borderWidth: 2,
   },
   iconContainer: {
     width: 44,
@@ -174,17 +176,20 @@ const styles = StyleSheet.create({
     fontFamily: Theme.typography.inter.regular,
     fontSize: 14,
     color: Theme.variants.text,
+
     lineHeight: 20,
     marginBottom: 4,
   },
   unreadText: {
     fontFamily: Theme.typography.inter.semibold,
     color: '#000',
+    backgroundColor: '#fff',
   },
   time: {
     fontFamily: Theme.typography.inter.regular,
     fontSize: 12,
     color: Theme.variants.textMuted,
+    backgroundColor: '#fff',
   },
   unreadDot: {
     width: 8,
@@ -213,6 +218,7 @@ const styles = StyleSheet.create({
     fontFamily: Theme.typography.inter.bold,
     fontSize: 18,
     color: Theme.variants.text,
+    backgroundColor: '#fff',
     marginBottom: 8,
   },
   emptySubtitle: {
@@ -220,6 +226,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Theme.variants.textMuted,
     textAlign: 'center',
+    backgroundColor: '#fff',
     lineHeight: 20,
   },
 });

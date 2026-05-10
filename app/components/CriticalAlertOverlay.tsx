@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Animated, Easing, Vibration, 
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Theme from '@/config/theme';
 import { useRouter } from 'expo-router';
+import { getDisasterMarkerColor } from '@/constants/utils';
 
 interface CriticalAlertOverlayProps {
   visible: boolean;
@@ -26,7 +27,7 @@ export default function CriticalAlertOverlay({ visible, type, data, distance, on
           Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ])
       );
-      
+
       Animated.timing(opacityAnim, {
         toValue: 1,
         duration: 400,
@@ -53,7 +54,7 @@ export default function CriticalAlertOverlay({ visible, type, data, distance, on
 
   return (
     <Modal transparent visible={visible} animationType="fade">
-      <Animated.View style={[styles.container, { opacity: opacityAnim }]}>
+      <Animated.View style={[styles.container, { opacity: opacityAnim, backgroundColor: getDisasterMarkerColor(data.type) }]}>
         <View style={styles.background}>
           <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]} />
           <Animated.View style={[styles.pulseCircleOuter, { transform: [{ scale: pulseAnim }] }]} />
@@ -71,15 +72,15 @@ export default function CriticalAlertOverlay({ visible, type, data, distance, on
           <View style={styles.detailsCard}>
             <Text style={styles.distanceText}>📍 {distance.toFixed(1)} km away</Text>
             <Text style={styles.descriptionText}>
-              {type === 'SOS' 
-                ? 'Someone nearby is in urgent need of assistance. Please check the map or proceed with caution.' 
+              {type === 'SOS'
+                ? 'Someone nearby is in urgent need of assistance. Please check the map or proceed with caution.'
                 : data.description}
             </Text>
           </View>
 
           <View style={styles.actions}>
-            <TouchableOpacity 
-              style={styles.viewBtn} 
+            <TouchableOpacity
+              style={styles.viewBtn}
               onPress={() => {
                 onDismiss();
                 if (type === 'REPORT') {

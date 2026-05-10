@@ -117,7 +117,7 @@ export default function ProfileScreen() {
         <SettingCard
           icon="users" title="Emergency Contacts"
           desc="Manage people notified during SOS"
-          badge={contactCount}
+
           onPress={() => router.push('/(tabs)/emergency-contacts')}
         />
         <SettingCard
@@ -139,7 +139,7 @@ export default function ProfileScreen() {
         <SettingCard
           icon="file-text" title="Terms and Conditions"
           desc="Review our terms and privacy policy"
-          onPress={() => Alert.alert('Terms', `Welcome to SoSync! By continuing to use our platform, you agree to abide by our terms and conditions. Please read them carefully to understand your rights and responsibilities when using SoSync for your safety. Thank you for being a part of our community! Version 1.0.0`)}
+          onPress={() => Alert.alert('Terms', `Welcome to SoSync! By continuing to use our platform, you agree to abide by our terms and conditions.\n\nPlease read them carefully to understand your rights and responsibilities when using SoSync for your safety.\n\nThank you for being a part of our community! Version 1.0.0`)}
         />
         <SettingCard
           icon="sign-out" title={loading ? 'Logging out...' : 'Logout'}

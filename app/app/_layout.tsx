@@ -2,15 +2,15 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import 'react-native-reanimated';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/config/firebaseConfig';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
+import * as Network from 'expo-network';
 import { useColorScheme } from '@/components/useColorScheme';
-import { UserProvider } from '@/context/UserContext';
+import { UserProvider, useUser } from '@/context/UserContext';
 import { registerForPushNotificationsAsync, setupNotificationListeners } from '@/services/NotificationService';
+import { View, Text, StyleSheet } from 'react-native';
+import Theme from '@/config/theme';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -52,26 +52,24 @@ export default function RootLayout() {
 
   return (
     <UserProvider>
-      <RootLayoutNav />
+      <RootLayoutNav loaded={loaded} />
     </UserProvider>
   );
 }
 
-import { useUser } from '@/context/UserContext';
-
-function RootLayoutNav() {
+function RootLayoutNav({ loaded }: { loaded: boolean }) {
   const colorScheme = useColorScheme();
 
   return (
     <SafeAreaProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AuthHandler />
+        <AuthHandler loaded={loaded} />
       </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-function AuthHandler() {
+function AuthHandler({ loaded }: { loaded: boolean }) {
   const { user, loading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
@@ -79,44 +77,66 @@ function AuthHandler() {
 
   useEffect(() => {
 
-    console.log(pathname);
+    // console.log('Pathname:', pathname, 'Segments:', segments);
     if (loading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inOnboardingGroup = segments[0] === '(onboarding)';
-    //console.log('User inside main layout:', user);
+    const inAuthGroup = segments.includes('(auth)') || pathname.includes('login') || pathname.includes('signup');
+    const inOnboardingGroup = segments.includes('(onboarding)') || pathname.includes('welcome') || pathname.includes('get-started');
+    const isBlockedScreen = segments.includes('blocked') || pathname.includes('blocked');
+
     if (!user) {
       if (!inAuthGroup && !inOnboardingGroup) {
-        // Redirect to welcome if not logged in and not in onboarding/auth flow
+        // Only redirect if not already in an allowed group
         router.replace('/(onboarding)/welcome');
       }
     } else {
-      // User is logged in
-      if (user?.onboarding_completed === false) {
-        // If onboarding is not complete, ensure they are in the onboarding flow (but not welcome/get-started)
-        if (!inOnboardingGroup || segments[1] === 'welcome' || segments[1] === 'get-started') {
+      // Check if account is suspended
+      if (user.is_active === false) {
+        if (!isBlockedScreen) {
+          router.replace('/blocked');
+        }
+        return;
+      }
+
+      // Prevent blocked users from staying on the blocked screen if they are now active
+      if (isBlockedScreen && user.is_active !== false) {
+        if (user.role === 'ADMIN') {
+          router.replace('/admin');
+        } else {
+          router.replace('/(tabs)');
+        }
+        return;
+      }
+
+      // User is logged in and active
+      if (user.onboarding_completed === false) {
+        // If on welcome or get-started, or not in onboarding at all, move to allow-gps
+        const isOnboardingStart = segments.includes('welcome') || segments.includes('get-started');
+        if (!inOnboardingGroup || isOnboardingStart) {
           router.replace('/(onboarding)/allow-gps');
         }
       } else {
-        // If onboarding is complete, prevent access to auth and onboarding screens
+        // Onboarding is completed, move to main app if still in auth/onboarding groups
         if (inAuthGroup || inOnboardingGroup) {
           if (user.role === 'ADMIN') {
-            router.replace('/admin' as any);
+            router.replace('/admin');
           } else {
             router.replace('/(tabs)');
           }
         }
       }
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, pathname]);
 
   // Push Notifications Setup
+  const pushRegistrationDone = useRef(false);
   useEffect(() => {
     let unsubscribeListeners: (() => void) | undefined;
 
-    if (user && user.onboarding_completed) {
+    if (user && user.onboarding_completed && !pushRegistrationDone.current) {
       // Register for push notifications
-      registerForPushNotificationsAsync(user.id as any);
+      registerForPushNotificationsAsync(user.id || user.uid);
+      pushRegistrationDone.current = true;
 
       // Setup foreground/response listeners
       unsubscribeListeners = setupNotificationListeners();
@@ -125,14 +145,26 @@ function AuthHandler() {
     return () => {
       if (unsubscribeListeners) unsubscribeListeners();
     };
-  }, [user]);
+  }, [user?.uid, user?.onboarding_completed]);
 
   // Hide splash screen once Firebase is done initializing
+  const [isOffline, setIsOffline] = useState(false);
+
   useEffect(() => {
-    if (!loading) {
+    const checkNetwork = async () => {
+      const state = await Network.getNetworkStateAsync();
+      setIsOffline(!state.isConnected);
+    };
+
+    const interval = setInterval(checkNetwork, 3000); // Check every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (loaded) {
       SplashScreen.hideAsync();
     }
-  }, [loading]);
+  }, [loaded]);
 
   // Prevent UI flash by keeping returning null while loading
   if (loading) return null;
@@ -141,12 +173,35 @@ function AuthHandler() {
   //console.log('USER ROLE: >>>>', user?.role)
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }}>
-      <Stack.Screen name="(onboarding)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-      <Stack.Screen name="admin" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
-      <Stack.Screen name="report/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: '#fff' } }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>Offline Mode: Checking connection...</Text>
+        </View>
+      )}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }}>
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+        <Stack.Screen name="admin" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+        <Stack.Screen name="report/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: '#fff' } }} />
+        <Stack.Screen name="blocked" options={{ headerShown: false, contentStyle: { backgroundColor: '#fff' } }} />
+      </Stack>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  offlineBanner: {
+    backgroundColor: '#333',
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 40, // Account for status bar
+  },
+  offlineText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: Theme.typography.inter.medium,
+  },
+});

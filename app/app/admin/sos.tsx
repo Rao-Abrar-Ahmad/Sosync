@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator }
 import MapView, { Marker, Callout } from 'react-native-maps';
 import Theme from '@/config/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { subscribeToActiveSOSAlerts, SOSAlertDocument } from '@/config/dbutils';
+import { subscribeToActiveSOSAlerts, adminUpdateSOSStatus, SOSAlertDocument } from '@/config/dbutils';
 import { formatDate } from '@/constants/utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,6 +19,15 @@ export default function AdminSOSMonitor() {
     });
     return () => unsubscribe();
   }, []);
+
+  const updateSOSStatus = async (id: string, status: 'RESPONDED' | 'RESOLVED') => {
+    try {
+      await adminUpdateSOSStatus(id, status);
+      setSelectedSOS(null);
+    } catch (error) {
+      console.error('Error updating SOS:', error);
+    }
+  };
 
   const renderSOSItem = ({ item }: { item: SOSAlertDocument }) => (
     <TouchableOpacity 
@@ -102,6 +111,37 @@ export default function AdminSOSMonitor() {
             }
           />
         </View>
+
+        {selectedSOS && (
+          <View style={styles.actionPanel}>
+            <View style={styles.panelHeader}>
+              <Text style={styles.panelTitle}>Manage SOS Alert</Text>
+              <TouchableOpacity onPress={() => setSelectedSOS(null)}>
+                <FontAwesome name="close" size={18} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.panelBody}>
+              <Text style={styles.panelInfo}>User ID: {selectedSOS.user_id}</Text>
+              <Text style={styles.panelInfo}>Location: {selectedSOS.latitude.toFixed(4)}, {selectedSOS.longitude.toFixed(4)}</Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, { backgroundColor: '#FF9800' }]} 
+                  onPress={() => updateSOSStatus(selectedSOS.id, 'RESPONDED')}
+                >
+                  <FontAwesome name="phone" size={14} color="#fff" />
+                  <Text style={styles.btnTxt}>Mark Responded</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, { backgroundColor: '#4CAF50' }]} 
+                  onPress={() => updateSOSStatus(selectedSOS.id, 'RESOLVED')}
+                >
+                  <FontAwesome name="check" size={14} color="#fff" />
+                  <Text style={styles.btnTxt}>Mark Resolved</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -235,5 +275,54 @@ const styles = StyleSheet.create({
   calloutText: {
     fontSize: 10,
     color: '#666',
+  },
+  actionPanel: {
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  panelTitle: {
+    fontFamily: Theme.typography.inter.bold,
+    fontSize: 16,
+    color: Theme.variants.text,
+  },
+  panelBody: {
+    gap: 8,
+  },
+  panelInfo: {
+    fontFamily: Theme.typography.inter.regular,
+    fontSize: 13,
+    color: Theme.variants.textMuted,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+  btnTxt: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: Theme.typography.inter.bold,
   },
 });

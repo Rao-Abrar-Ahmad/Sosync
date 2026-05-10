@@ -115,49 +115,66 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let userDocUnsubscribe: (() => void) | undefined;
+
+    const authUnsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        dispatch({ type: 'SET_LOADING', payload: true });
-
         if (firebaseUser) {
-          // Firebase user exists, now fetch their Firestore document
+          dispatch({ type: 'SET_LOADING', payload: true });
+
+          // Firebase user exists, now set up a real-time listener for their Firestore document
+          const { onSnapshot } = await import('firebase/firestore');
           const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
 
-          let userData: UserData = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL,
-          };
+          // Clean up existing listener if it exists
+          if (userDocUnsubscribe) userDocUnsubscribe();
 
-          // Merge Firestore data if it exists
-          if (userDocSnap.exists()) {
-            const firestoreData = userDocSnap.data();
-            userData = {
-              ...userData,
-              ...firestoreData,
-              // Convert Firestore timestamps to Date objects if they exist
-              created_at: firestoreData.created_at?.toDate?.() || undefined,
-              updated_at: firestoreData.updated_at?.toDate?.() || undefined,
-              location_permission_granted_at: firestoreData.location_permission_granted_at?.toDate?.() || undefined,
+          userDocUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+            let userData: UserData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+              photoURL: firebaseUser.photoURL,
             };
-          }
 
-          dispatch({
-            type: 'SET_USER',
-            payload: userData,
+            if (docSnap.exists()) {
+              const firestoreData = docSnap.data();
+              userData = {
+                ...userData,
+                ...firestoreData,
+                created_at: firestoreData.created_at?.toDate?.() || undefined,
+                updated_at: firestoreData.updated_at?.toDate?.() || undefined,
+                location_permission_granted_at: firestoreData.location_permission_granted_at?.toDate?.() || undefined,
+              };
+            }
+
+            dispatch({
+              type: 'SET_USER',
+              payload: userData,
+            });
+          }, (error) => {
+            console.error('Error listening to user data:', error);
+            dispatch({ type: 'SET_ERROR', payload: 'Failed to sync user data' });
           });
+
         } else {
+          // Clean up listener if user logs out
+          if (userDocUnsubscribe) {
+            userDocUnsubscribe();
+            userDocUnsubscribe = undefined;
+          }
           dispatch({ type: 'CLEAR_USER' });
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
-        dispatch({ type: 'SET_ERROR', payload: 'Failed to load user data' });
+        console.error('Error setting up user auth/sync:', error);
+        dispatch({ type: 'SET_ERROR', payload: 'Authentication sync error' });
       }
     });
 
-    return unsubscribe;
+    return () => {
+      authUnsubscribe();
+      if (userDocUnsubscribe) userDocUnsubscribe();
+    };
   }, []);
 
   return (

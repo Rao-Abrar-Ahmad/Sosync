@@ -26,6 +26,7 @@ export default function AdminReportDetail() {
   // Form State
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ReportStatus>('PENDING');
+  const [severity, setSeverity] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -45,6 +46,7 @@ export default function AdminReportDetail() {
         setReport(reportData);
         setDescription(reportData.description);
         setStatus(reportData.status);
+        setSeverity(reportData.severity_level || '');
       }
       setVotes(votesData);
     } catch (error) {
@@ -62,6 +64,7 @@ export default function AdminReportDetail() {
       await updateDisasterReport(report.id, {
         description,
         status,
+        severity_level: severity,
       });
       Alert.alert('Success', 'Report updated successfully.');
       fetchData();
@@ -143,6 +146,22 @@ export default function AdminReportDetail() {
               onChangeText={setDescription}
               placeholder="Enter report description..."
             />
+
+            <Text style={styles.label}>Severity Level</Text>
+            <View style={styles.statusRow}>
+              {['Low', 'Medium', 'High', 'Critical'].map((level) => (
+                <TouchableOpacity
+                  key={level}
+                  style={[
+                    styles.statusBtn,
+                    severity === level && { backgroundColor: '#333' }
+                  ]}
+                  onPress={() => setSeverity(level)}
+                >
+                  <Text style={[styles.statusBtnTxt, severity === level && { color: '#fff' }]}>{level}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={styles.label}>Update Status</Text>
             <View style={styles.statusRow}>

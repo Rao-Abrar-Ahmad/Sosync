@@ -47,6 +47,7 @@ export default function AdminDashboard() {
     { title: 'Manage Reports', icon: 'file-text-o', color: '#F5A623', route: '/admin/reports' },
     { title: 'SOS Monitor', icon: 'warning', color: '#D0021B', route: '/admin/sos' },
     { title: 'Broadcast Alerts', icon: 'bullhorn', color: '#7ED321', route: '/admin/broadcast' },
+    { title: 'Flagged Content', icon: 'flag', color: '#F44336', route: '/admin/flags' },
   ];
 
   if (loading) {
@@ -59,7 +60,7 @@ export default function AdminDashboard() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
@@ -87,8 +88,8 @@ export default function AdminDashboard() {
         <Text style={styles.sectionTitle}>Management Modules</Text>
         <View style={styles.menuGrid}>
           {navItems.map((item, idx) => (
-            <TouchableOpacity 
-              key={idx} 
+            <TouchableOpacity
+              key={idx}
               style={styles.menuCard}
               onPress={() => router.push(item.route as any)}
               activeOpacity={0.7}
@@ -104,10 +105,10 @@ export default function AdminDashboard() {
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <FontAwesome name="sign-out" size={18} color="#ff4444" />
-          <Text style={styles.logoutTxt}>System Sign Out</Text>
+          <Text style={styles.logoutTxt}>Log Out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.footer}>Sosync Admin v1.0.2 • Secure Session</Text>
+
       </ScrollView>
     </SafeAreaView>
   );

@@ -25,6 +25,7 @@ export default function LoginScreen() {
     const insets = useSafeAreaInsets();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const router = useRouter();
@@ -143,14 +144,32 @@ export default function LoginScreen() {
 
                         {/* Password Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
-                            <Input
-                                placeholder="Enter your password"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                editable={!loading && !googleLoading}
-                            />
+                            <View style={styles.labelRow}>
+                                <Text style={styles.label}>Password</Text>
+                                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+                                    <Text style={styles.forgotLink}>Forgot Password?</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.passwordWrapper}>
+                                <Input
+                                    placeholder="Enter your password"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    editable={!loading && !googleLoading}
+                                    style={styles.passwordInput}
+                                />
+                                <TouchableOpacity 
+                                    style={styles.eyeIcon} 
+                                    onPress={() => setShowPassword(!showPassword)}
+                                >
+                                    <FontAwesome 
+                                        name={showPassword ? "eye" : "eye-slash"} 
+                                        size={18} 
+                                        color={Theme.variants.textMuted} 
+                                    />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {/* Sign In Button */}
@@ -239,9 +258,20 @@ const styles = StyleSheet.create({
         color: Theme.variants.text,
         marginBottom: 8,
     },
+    labelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    forgotLink: {
+        fontFamily: Theme.typography.inter.semibold,
+        fontSize: 12,
+        color: Theme.variants.primary,
+        marginBottom: 8,
+    },
     button: {
         backgroundColor: Theme.variants.primary,
-        padding: 15,
+        padding: 12,
         borderRadius: 10,
         alignItems: 'center',
         marginTop: 10,
@@ -257,7 +287,7 @@ const styles = StyleSheet.create({
     buttonText: {
         fontFamily: Theme.typography.inter.bold,
         color: '#fff',
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '600',
     },
     dividerContainer: {
@@ -281,7 +311,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: Theme.variants.border,
-        padding: 15,
+        padding: 12,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
@@ -295,7 +325,7 @@ const styles = StyleSheet.create({
     googleButtonText: {
         fontFamily: Theme.typography.inter.semibold,
         color: '#000',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
     },
     footer: {
@@ -313,5 +343,19 @@ const styles = StyleSheet.create({
         color: Theme.variants.primary,
         fontSize: 14,
         fontWeight: '600',
+    },
+    passwordWrapper: {
+        position: 'relative',
+        justifyContent: 'center',
+    },
+    passwordInput: {
+        paddingRight: 45,
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: 12,
+        height: '100%',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
     },
 });

@@ -50,23 +50,36 @@ export async function registerForPushNotificationsAsync(userId: string) {
     return null;
   }
 
-  try {
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ??
-      Constants?.easConfig?.projectId;
+  let retryCount = 0;
+  const maxRetries = 3;
 
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId }))
-      .data;
-    console.log("Push Token:", token);
+  while (retryCount < maxRetries) {
+    try {
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ??
+        Constants?.easConfig?.projectId;
 
-    // Save token to Firestore
-    await updateUserPushToken(userId, token);
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId }))
+        .data;
 
-    return token;
-  } catch (error) {
-    console.error("Error getting push token:", error);
-    return null;
+      // Save token to Firestore
+      await updateUserPushToken(userId, token);
+      return token;
+    } catch (error: any) {
+      const isServiceUnavailable = error.message?.includes('503') || error.message?.includes('SERVICE_UNAVAILABLE');
+      
+      if (isServiceUnavailable && retryCount < maxRetries - 1) {
+        retryCount++;
+        console.log(`[Push Notification] Expo server busy (503). Retrying in ${3 * retryCount}s... (Attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 3000 * retryCount));
+        continue;
+      }
+
+      console.error("Error getting push token:", error);
+      return null;
+    }
   }
+  return null;
 }
 
 export function setupNotificationListeners() {
@@ -133,6 +146,49 @@ export async function sendSOSPushNotification(
       });
     } catch (error) {
       console.error("Error sending push notification:", error);
+    }
+  }
+}
+
+/**
+ * Send a generic broadcast notification to multiple users
+ */
+export async function sendBroadcastPushNotification(
+  expoPushTokens: string[],
+  title: string,
+  body: string,
+  data: any = {},
+): Promise<void> {
+  const messages = expoPushTokens.map((token) => ({
+    to: token,
+    sound: "default",
+    title: title,
+    body: body,
+    data: {
+      type: "BROADCAST",
+      ...data,
+    },
+    priority: "high" as const,
+  }));
+
+  const chunks = [];
+  for (let i = 0; i < messages.length; i += 100) {
+    chunks.push(messages.slice(i, i + 100));
+  }
+
+  for (const chunk of chunks) {
+    try {
+      await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Accept-encoding": "gzip, deflate",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chunk),
+      });
+    } catch (error) {
+      console.error("Error sending broadcast notification:", error);
     }
   }
 }
