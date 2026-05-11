@@ -1,0 +1,80 @@
+@startuml
+title Admin Interaction Sequence Diagram
+
+actor Admin
+participant "Expo App" as Panel
+participant "Firebase Authentication" as Auth
+participant "Firestore" as DB
+participant "Firebase Storage" as Storage
+participant "Cloud Functions" as CF
+participant "Firebase Cloud Messaging" as FCM
+
+== Admin Authentication ==
+Admin -> Panel : Login credentials
+activate Panel
+Panel -> Auth : Authenticate admin
+activate Auth
+Auth --> Panel : Authentication success
+deactivate Auth
+deactivate Panel
+
+== View & Review Reports ==
+Admin -> Panel : View disaster reports
+activate Panel
+Panel -> DB : Fetch reports
+activate DB
+DB --> Panel : Reports data
+deactivate DB
+deactivate Panel
+
+Admin -> Panel : View vote statistics
+activate Panel
+Panel -> DB : Fetch vote counts
+activate DB
+DB --> Panel : Voting results
+deactivate DB
+deactivate Panel
+
+== Moderate Disaster Reports ==
+Admin -> Panel : Verify / Resolve / Mark false
+activate Panel
+Panel -> DB : Update report status
+activate DB
+DB -> CF : Trigger business logic
+activate CF
+CF -> FCM : Notify users
+activate FCM
+FCM --> Panel : Notification sent
+deactivate FCM
+deactivate CF
+deactivate DB
+deactivate Panel
+
+== Manage Report Media ==
+Admin -> Panel : Remove misleading media
+activate Panel
+Panel -> Storage : Delete media
+activate Storage
+Storage --> Panel : Confirmation
+deactivate Storage
+deactivate Panel
+
+== User Management ==
+Admin -> Panel : Enable / Disable user
+activate Panel
+Panel -> DB : Update user status
+activate DB
+DB --> Panel : Confirmation
+deactivate DB
+deactivate Panel
+
+== Monitor SOS Events ==
+Admin -> Panel : View SOS alerts
+activate Panel
+Panel -> DB : Fetch SOS records
+activate DB
+DB --> Panel : SOS data
+deactivate DB
+deactivate Panel
+
+@enduml

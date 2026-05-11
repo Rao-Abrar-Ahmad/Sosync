@@ -1,0 +1,91 @@
+@startuml
+title User Interaction Sequence Diagram
+
+actor User
+participant "Expo App" as App
+participant "Firebase Authentication" as Auth
+participant "Firestore" as DB
+participant "Firebase Storage" as Storage
+participant "GPS Service" as GPS
+participant "Firebase Cloud Messaging" as FCM
+participant "Emergency Contacts" as Contacts
+
+User -> App : Launch app
+activate App
+App -> Auth : Authenticate user
+activate Auth
+Auth --> App : Login success
+deactivate Auth
+deactivate App
+
+== View Disaster Reports ==
+User -> App : View reports
+activate App
+App -> DB : Fetch reports
+activate DB
+DB --> App : Report list
+deactivate DB
+App --> User : Display list / map
+deactivate App
+
+== Create Disaster Report ==
+User -> App : Create report
+activate App
+App -> GPS : Fetch location
+activate GPS
+GPS --> App : Coordinates
+deactivate GPS
+User -> App : Add details & media
+App -> Storage : Upload media
+activate Storage
+Storage --> App : Media URL
+deactivate Storage
+App -> DB : Save report
+activate DB
+deactivate DB
+deactivate App
+
+== Vote on Report ==
+User -> App : Confirm / Dismiss report
+activate App
+App -> DB : Save vote
+activate DB
+DB --> App : Vote recorded
+deactivate DB
+deactivate App
+
+== Manage Emergency Contacts ==
+User -> App : Add / Update contacts
+activate App
+App -> DB : Save contacts
+activate DB
+DB --> App : Confirmation
+deactivate DB
+deactivate App
+
+== SOS Emergency ==
+User -> App : Press SOS
+activate App
+App -> DB : Check saved contacts
+activate DB
+DB --> App : Contact list
+deactivate DB
+App -> GPS : Get live location
+activate GPS
+GPS --> App : Coordinates
+deactivate GPS
+App -> Contacts : Send SOS alert
+activate Contacts
+App -> DB : Store SOS event
+activate DB
+deactivate DB
+deactivate Contacts
+deactivate App
+
+== Notifications ==
+FCM --> App : Receive notification
+activate App
+App --> User : Show alert
+deactivate App
+
+@enduml

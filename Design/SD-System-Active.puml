@@ -1,0 +1,90 @@
+@startuml
+title System/Backend Sequence Diagram
+
+participant "Firebase Authentication" as Auth
+participant "Firestore" as DB
+participant "Cloud Functions" as CF
+participant "Firebase Storage" as Storage
+participant "Firebase Cloud Messaging" as FCM
+participant "Emergency Contacts" as Contacts
+participant "Expo App" as App
+
+== Authentication & Role Assignment ==
+Auth -> DB : Validate user
+activate Auth
+activate DB
+DB --> Auth : Role (User/Admin)
+deactivate DB
+Auth --> App : Access token
+deactivate Auth
+
+== Disaster Report Handling ==
+App -> DB : Submit disaster report
+activate DB
+DB -> CF : New report trigger
+activate CF
+CF -> DB : Set status = Pending
+CF -> FCM : Notify nearby users
+activate FCM
+deactivate FCM
+deactivate CF
+deactivate DB
+
+== Media Association ==
+App -> Storage : Upload media
+activate Storage
+Storage --> DB : Save media URL
+activate DB
+deactivate DB
+deactivate Storage
+
+== Voting & Verification Logic ==
+App -> DB : Submit vote
+activate DB
+DB -> CF : Vote update trigger
+activate CF
+CF -> CF : Check vote threshold
+CF -> DB : Update verification status
+CF -> FCM : Notify users & admin
+activate FCM
+deactivate FCM
+deactivate CF
+deactivate DB
+
+== Admin Overrides ==
+DB -> CF : Admin status update
+activate CF
+CF -> FCM : Broadcast status change
+activate FCM
+deactivate FCM
+deactivate CF
+
+== SOS Automation ==
+App -> DB : Store SOS alert
+activate DB
+DB -> CF : SOS trigger
+activate CF
+CF -> Contacts : Send emergency alerts
+activate Contacts
+CF -> FCM : Notify admin
+activate FCM
+deactivate FCM
+deactivate Contacts
+deactivate CF
+deactivate DB
+
+== Data Cleanup ==
+DB -> CF : Report/media deletion
+activate CF
+CF -> Storage : Remove media
+activate Storage
+CF -> DB : Update references
+deactivate Storage
+deactivate CF
+
+== Real-Time Sync ==
+DB --> App : Live updates
+activate DB
+deactivate DB
+
+@enduml
