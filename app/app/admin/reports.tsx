@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
 import Theme from '@/config/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { getAllDisasterReports, adminUpdateReportStatus, DisasterReportDocument, ReportStatus } from '@/config/dbutils';
@@ -28,8 +28,8 @@ export default function AdminReportManagement() {
     fetchReports();
   }, []);
 
-  const filteredReports = filter === 'ALL' 
-    ? reports 
+  const filteredReports = filter === 'ALL'
+    ? reports
     : reports.filter(r => r.status === filter);
 
   const updateStatus = (reportId: string, status: ReportStatus) => {
@@ -38,8 +38,8 @@ export default function AdminReportManagement() {
       `Change report status to ${status}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Confirm', 
+        {
+          text: 'Confirm',
           onPress: async () => {
             try {
               await adminUpdateReportStatus(reportId, status);
@@ -54,8 +54,8 @@ export default function AdminReportManagement() {
   };
 
   const renderReportItem = ({ item }: { item: DisasterReportDocument }) => (
-    <TouchableOpacity 
-      style={styles.reportCard} 
+    <TouchableOpacity
+      style={styles.reportCard}
       onPress={() => router.push(`/admin/report/${item.id}` as any)}
     >
       <View style={styles.cardHeader}>
@@ -64,22 +64,54 @@ export default function AdminReportManagement() {
           <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
         </View>
       </View>
-      
+
       <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-      
+
       <View style={styles.locationRow}>
         <FontAwesome name="map-marker" size={12} color={Theme.variants.textMuted} />
         <Text style={styles.locationTxt} numberOfLines={1}>
           {item.address || `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}`}
         </Text>
       </View>
-      
+
       <View style={styles.cardFooter}>
-        <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+        <View style={styles.date}>
+          <FontAwesome name="calendar" size={12} color="#aaa" />
+          <Text>{formatDate(item.created_at)}</Text>
+        </View>
         <View style={styles.voteStats}>
           <Text style={styles.voteTxt}>✅ {item.confirm_count || 0}</Text>
           <Text style={styles.voteTxt}>❌ {item.dismiss_count || 0}</Text>
         </View>
+      </View>
+
+      <View>
+        {item?.media && item?.media?.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, marginTop: 12 }}
+          >
+            {item.media.map((mediaItem, index) => (
+              <View
+                key={index}
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  backgroundColor: '#eee',
+                }}
+              >
+                <Image
+                  source={{ uri: mediaItem.url }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       <View style={styles.adminActions}>
@@ -104,8 +136,8 @@ export default function AdminReportManagement() {
       <View style={styles.filterWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           {['ALL', 'PENDING', 'VERIFIED', 'RESOLVED', 'FALSE_ALARM'].map((f) => (
-            <TouchableOpacity 
-              key={f} 
+            <TouchableOpacity
+              key={f}
               style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
               onPress={() => setFilter(f as any)}
             >
@@ -226,6 +258,10 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: '#aaa',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    display: 'flex'
   },
   voteStats: {
     flexDirection: 'row',

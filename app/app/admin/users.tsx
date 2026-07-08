@@ -36,7 +36,7 @@ export default function AdminUserManagement() {
   }, []);
 
   useEffect(() => {
-    const filtered = users.filter(u => 
+    const filtered = users.filter(u =>
       (u.first_name + ' ' + u.last_name).toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase())
     );
@@ -50,8 +50,8 @@ export default function AdminUserManagement() {
       `Are you sure you want to change ${user.first_name}'s role to ${newRole}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Update', 
+        {
+          text: 'Update',
           onPress: async () => {
             try {
               await adminUpdateUserRole(user.id as any, newRole);
@@ -72,8 +72,8 @@ export default function AdminUserManagement() {
       `Are you sure you want to ${newStatus ? 'activate' : 'suspend'} ${user.first_name}'s account?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: newStatus ? 'Activate' : 'Suspend', 
+        {
+          text: newStatus ? 'Activate' : 'Suspend',
           style: newStatus ? 'default' : 'destructive',
           onPress: async () => {
             try {
@@ -139,19 +139,19 @@ export default function AdminUserManagement() {
       </View>
       <View style={styles.actionGroup}>
         <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditPress(item)}>
-          <FontAwesome name="edit" size={16} color={Theme.variants.primary} />
+          <Text>Edit</Text><FontAwesome name="edit" size={16} color={Theme.variants.primary} />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtn, { marginLeft: 10 }]} onPress={() => toggleRole(item)}>
-          <FontAwesome name="exchange" size={16} color="#666" />
+          <Text>Role</Text><FontAwesome name="exchange" size={16} color="#666" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.actionBtn, { marginLeft: 10, backgroundColor: item.is_active === false ? '#4caf5015' : '#f4433615' }]} 
+        <TouchableOpacity
+          style={[styles.actionBtn, { marginLeft: 10, backgroundColor: item.is_active === false ? '#4caf5015' : '#f4433615' }]}
           onPress={() => toggleUserStatus(item)}
         >
-          <FontAwesome 
-            name={item.is_active === false ? "unlock" : "lock"} 
-            size={16} 
-            color={item.is_active === false ? "#4caf50" : "#f44336"} 
+          <Text>Suspend</Text><FontAwesome
+            name={item.is_active === false ? "unlock" : "lock"}
+            size={16}
+            color={item.is_active === false ? "#4caf50" : "#f44336"}
           />
         </TouchableOpacity>
       </View>
@@ -162,7 +162,7 @@ export default function AdminUserManagement() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.searchBar}>
         <FontAwesome name="search" size={16} color="#aaa" />
-        <TextInput 
+        <TextInput
           style={styles.searchInput}
           placeholder="Search name or email..."
           value={search}
@@ -197,7 +197,7 @@ export default function AdminUserManagement() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalContent}
           >
@@ -240,8 +240,8 @@ export default function AdminUserManagement() {
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[styles.updateBtn, updating && { opacity: 0.7 }]} 
+              <TouchableOpacity
+                style={[styles.updateBtn, updating && { opacity: 0.7 }]}
                 onPress={handleUpdateUser}
                 disabled={updating}
               >
@@ -284,8 +284,10 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: "flex-start",
+    gap: 12,
+    width: '100%',
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -294,6 +296,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%'
   },
   avatar: {
     width: 44,
@@ -347,11 +350,17 @@ const styles = StyleSheet.create({
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    flexBasis: '100%'
   },
   actionBtn: {
     padding: 10,
     backgroundColor: '#f0f7ff',
     borderRadius: 8,
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
   },
   emptyTxt: {
     textAlign: 'center',

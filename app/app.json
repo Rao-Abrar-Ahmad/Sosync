@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": ["sosync", "com.sosync.sosync"],
+    "scheme": [
+      "sosync",
+      "com.sosync.sosync"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -47,7 +50,9 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/Geom.ttf"],
+          "fonts": [
+            "./assets/fonts/Geom.ttf"
+          ],
           "android": {
             "fonts": [
               {
@@ -62,7 +67,9 @@
             ]
           },
           "ios": {
-            "fonts": ["./assets/fonts/Geom.ttf"]
+            "fonts": [
+              "./assets/fonts/Geom.ttf"
+            ]
           }
         }
       ],
@@ -84,7 +91,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "dfcbf789-2434-4113-9026-e9fe5dc26491"
+        "projectId": "1606583a-d52c-4e76-9fcc-c18c3f689be1"
       }
     }
   }

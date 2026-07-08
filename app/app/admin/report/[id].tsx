@@ -81,8 +81,8 @@ export default function AdminReportDetail() {
       'Are you sure you want to permanently remove this media item?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -125,9 +125,6 @@ export default function AdminReportDetail() {
             <View style={styles.readOnlyBox}>
               <Text style={styles.readOnlyTxt}>{report.type}</Text>
             </View>
-
-            <Text style={styles.label}>Reporter ID</Text>
-            <Text style={styles.subLabel}>{report.user_id}</Text>
 
             <Text style={styles.label}>Location</Text>
             <Text style={styles.subLabel}>{report.address || `${report.latitude.toFixed(4)}, ${report.longitude.toFixed(4)}`}</Text>
@@ -203,8 +200,8 @@ export default function AdminReportDetail() {
               {report.media.map((item, index) => (
                 <View key={index} style={styles.mediaItem}>
                   <Image source={{ uri: item.url }} style={styles.mediaThumb} />
-                  <TouchableOpacity 
-                    style={styles.deleteMediaBtn} 
+                  <TouchableOpacity
+                    style={styles.deleteMediaBtn}
                     onPress={() => handleRemoveMedia(item.file_name)}
                   >
                     <FontAwesome name="trash" size={14} color="#fff" />
