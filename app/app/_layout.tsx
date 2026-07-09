@@ -73,16 +73,16 @@ function AuthHandler({ loaded }: { loaded: boolean }) {
   const { user, loading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const segments = useSegments();
+  const segments: any = useSegments();
 
   useEffect(() => {
 
     // console.log('Pathname:', pathname, 'Segments:', segments);
     if (loading) return;
 
-    const inAuthGroup = segments.includes('(auth)') || pathname.includes('login') || pathname.includes('signup');
-    const inOnboardingGroup = segments.includes('(onboarding)') || pathname.includes('welcome') || pathname.includes('get-started');
-    const isBlockedScreen = segments.includes('blocked') || pathname.includes('blocked');
+    const inAuthGroup = segments?.includes('(auth)' as any) || pathname.includes('login') || pathname.includes('signup');
+    const inOnboardingGroup = segments?.includes('(onboarding)' as any) || pathname.includes('welcome') || pathname.includes('get-started');
+    const isBlockedScreen = segments?.includes('blocked' as any) || pathname.includes('blocked');
 
     if (!user) {
       if (!inAuthGroup && !inOnboardingGroup) {
@@ -99,7 +99,7 @@ function AuthHandler({ loaded }: { loaded: boolean }) {
       }
 
       // Prevent blocked users from staying on the blocked screen if they are now active
-      if (isBlockedScreen && user.is_active !== false) {
+      if (isBlockedScreen && user.is_active === true) {
         if (user.role === 'ADMIN') {
           router.replace('/admin');
         } else {

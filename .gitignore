@@ -65,5 +65,4 @@ yarn-error.log*
 lerna-debug.log*
 
 
-app/config/firebaseConfig.ts
 scripts
