@@ -159,14 +159,14 @@ export default function LoginScreen() {
                                     editable={!loading && !googleLoading}
                                     style={styles.passwordInput}
                                 />
-                                <TouchableOpacity 
-                                    style={styles.eyeIcon} 
+                                <TouchableOpacity
+                                    style={styles.eyeIcon}
                                     onPress={() => setShowPassword(!showPassword)}
                                 >
-                                    <FontAwesome 
-                                        name={showPassword ? "eye" : "eye-slash"} 
-                                        size={18} 
-                                        color={Theme.variants.textMuted} 
+                                    <FontAwesome
+                                        name={showPassword ? "eye" : "eye-slash"}
+                                        size={18}
+                                        color={Theme.variants.textMuted}
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -181,6 +181,11 @@ export default function LoginScreen() {
                             <Text style={styles.buttonText}>
                                 {loading ? 'Signing In...' : 'Sign In'}
                             </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+
+                        >
+                            <Text style={styles.buttonText}>Sign in with Microsoft</Text>
                         </TouchableOpacity>
 
                         {/* OR Divider */}
@@ -350,6 +355,8 @@ const styles = StyleSheet.create({
     },
     passwordInput: {
         paddingRight: 45,
+        borderWidth: 0,
+        outline: 'none'
     },
     eyeIcon: {
         position: 'absolute',

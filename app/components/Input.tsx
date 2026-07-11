@@ -11,7 +11,7 @@ export default function Input(props: TextInputProps) {
             {...props}
             style={[
                 props.style,
-                isFocused ? styles.inputFocused : styles.inputBlur,
+                // isFocused ? styles.inputFocused : styles.inputBlur,
                 {
                     fontFamily: Theme.typography.inter.regular,
                     borderWidth: 1,
@@ -26,15 +26,13 @@ export default function Input(props: TextInputProps) {
     );
 }
 
-const styles = StyleSheet.create({
-    // Style applied when NOT focused
-    inputBlur: {
-        borderColor: '#E2E8F0',
-        color: '#000'
-    },
-    // Style applied WHEN focused
-    inputFocused: {
-        borderColor: '#3B82F6', // Your active focus color,
-        color: '#000'
-    },
-});
+// const styles = StyleSheet.create({
+//     // Style applied when NOT focused
+//     inputBlur: {
+//         color: '#000'
+//     },
+//     // Style applied WHEN focused
+//     inputFocused: {
+//         color: '#000'
+//     },
+// });
